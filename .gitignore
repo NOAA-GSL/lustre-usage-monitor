@@ -1,0 +1,13 @@
+*~
+out
+junk
+reports
+log
+*.done
+*.txt
+*.du.*
+*.tmp
+rootfile*
+core*
+*.log**.o
+*.exe
