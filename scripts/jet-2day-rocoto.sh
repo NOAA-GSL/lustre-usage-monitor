@@ -15,6 +15,8 @@ set -e
 
 cd $HOME/usage-monitor
 
+echo "$HOME" > home.ent
+
 areas=( $( cat disk-areas.lst ) )
 echo " " ${areas[@]} | sed 's, /, ,g ; s,/,--,g' > dir-entity-list.ent
 

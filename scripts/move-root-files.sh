@@ -3,7 +3,7 @@
 # Workaround for issue in SLURM: sometimes you will have a root-owned
 # log file. These can break things if they're left where they are.
 
-# This script assumes no shell metacharacters in the filenames.
+# This script assumes no whitespace in the filenames.
 
 cd "$HOME/usage-monitor"
 mkdir -p junk/root
