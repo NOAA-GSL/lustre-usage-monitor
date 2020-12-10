@@ -7,17 +7,13 @@ export ROCOTO_SACCT_CACHE=$HOME/sacct-cache/sacct.txt
 module use /lfs4/BMC/wrfruc/Samuel.Trahan/soft/modulefiles/
 module load rocoto/1.3.2-sacct-cache
 
-if [[ -t 1 ]] ; then
-    set -x
-fi
-
 set -e
 
 cd "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}"
 
 echo -n "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}" > topdir.ent
 
-areas=( $( cat disk-areas.lst ) )
+areas=( $( cat jet-disk-areas.lst ) )
 echo " " ${areas[@]} | sed 's, /, ,g ; s,/,--,g' > dir-entity-list.ent
 
 origin=$( date +%s -d "2020-08-01t00:00:00" )
