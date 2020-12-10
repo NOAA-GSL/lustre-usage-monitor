@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
   
 <!DOCTYPE workflow [
-<!ENTITY HOME "./home.ent">
-<!ENTITY TOPDIR "&HOME;/usage-monitor">
+<!ENTITY TOPDIR SYSTEM "./topdir.ent">
 <!ENTITY OUTDIR "&TOPDIR;/out">
 <!ENTITY DISK_USAGE_PROGRAM "&TOPDIR;/lustre-disk-usage.exe">
 <!ENTITY REPORT_SCRIPT "&TOPDIR;/final_report.sh">
@@ -17,6 +16,8 @@
 <!ENTITY SEARCH_DAYS "0 1 2 3">
 <!ENTITY ACCOUNT "zrtrr">
 <!ENTITY RESTART_HANG_TIME "1500">
+<!ENTITY RESTART_INTERVAL "120">
+<!ENTITY TOPDIR_ENVAR "<envar><name>USAGE_MONITOR</name><value>&TOPDIR;</value></envar>">
 ]>
 
 <workflow realtime="T" scheduler="slurm" taskthrottle="8" cyclethrottle="2" cyclelifespan="01:06:00:00">
@@ -32,6 +33,7 @@
     <cores>1</cores>
     <command>set -x ; rm -rf <cyclestr offset="-13:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-12:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-11:00:00:00">&OUTDIR;/@Y@m@d</cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/scrub.log</cyclestr></join>
+    &TOPDIR_ENVAR;
     <dependency>
         <timedep><cyclestr offset="&SCRUB_OFFSET;">@Y@m@d@H@M@S</cyclestr></timedep>
     </dependency>
@@ -44,8 +46,9 @@
       <walltime>03:00:00</walltime>
       <account>&ACCOUNT;</account>
       <cores>1</cores>
-      <command><cyclestr>set -x ; ulimit -c 0 ; cd "&OUTDIR;/@Y@m@d" ; mkdir "#dir#" ; &DISK_USAGE_PROGRAM; -d "#dir#.done" -r `echo /"#dir#" | sed s,--,/,g`  "#dir#.rst.gz" "#dir#/" -o "#dir#.txt"</cyclestr></command>
+      <command><cyclestr>set -x ; ulimit -c 0 ; cd "&OUTDIR;/@Y@m@d" ; mkdir "#dir#" ; &DISK_USAGE_PROGRAM; -t "&RESTART_INTERVAL;" -d "#dir#.done" -r `echo /"#dir#" | sed s,--,/,g`  "#dir#.rst.gz" "#dir#/" -o "#dir#.txt"</cyclestr></command>
       <join><cyclestr>&OUTDIR;/@Y@m@d/log/#dir#.log</cyclestr></join>
+      &TOPDIR_ENVAR;
       <dependency>
         <timedep><cyclestr offset="&SCAN_OFFSET;">@Y@m@d@H@M@S</cyclestr></timedep>
       </dependency>
@@ -70,6 +73,7 @@
     <cores>1</cores>
     <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;" &DIRS; </cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/report.log</cyclestr></join>
+    &TOPDIR_ENVAR;
     <dependency>
       <and>
         <metataskdep metatask="du"></metataskdep>
@@ -85,6 +89,7 @@
     <cores>1</cores>
     <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;" &DIRS; </cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/report.log</cyclestr></join>
+    &TOPDIR_ENVAR;
     <dependency>
       <and>
         <timedep><cyclestr offset="&DEADLINE;">@Y@m@d@H@M@S</cyclestr></timedep>

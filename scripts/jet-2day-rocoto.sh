@@ -13,9 +13,9 @@ fi
 
 set -e
 
-cd $HOME/usage-monitor
+cd "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}"
 
-echo "$HOME" > home.ent
+echo "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}" > topdir.ent
 
 areas=( $( cat disk-areas.lst ) )
 echo " " ${areas[@]} | sed 's, /, ,g ; s,/,--,g' > dir-entity-list.ent

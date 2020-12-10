@@ -5,7 +5,7 @@
 
 # This script assumes no whitespace in the filenames.
 
-cd "$HOME/usage-monitor"
+cd "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}"
 mkdir -p junk/root
 find . -uid 0 -a -not -name '.*' | grep -v junk/root | while read bad ; do
     f=$( printf "junk/root/rootfile_%s_%02x%02x%02x%02x" \
