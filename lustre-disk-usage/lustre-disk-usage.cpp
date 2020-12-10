@@ -23,9 +23,6 @@ extern "C" {
 
 #include <zlib.h>
 #include <lustre/lustreapi.h>
-
-#include <linux/lustre/lustre_user.h>
-#include <linux/lustre/lustre_idl.h>
 }
 
 #include <exception>
@@ -39,7 +36,6 @@ extern "C" {
 #include <memory>
 #include <algorithm>
 
-#define MAX_LOV_UUID_COUNT      1000
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////
@@ -153,7 +149,7 @@ private:
 
 class DiskUsage {
 public:
-  DiskUsage(const string &path,const string &restart_file,const string &output_base,bool restart=false,bool use_lustre_calls=false);
+  DiskUsage(const string &path,const string &restart_file,const string &output_base,bool restart=false);
   void insert_unseen(int64_t total_usage,const string &name);
   DirResult tree_walk();
   int64_t time_elapsed() const;
@@ -183,8 +179,6 @@ private:
   vector < shared_ptr<TopResult> > ordered_results;
   unordered_map < string,shared_ptr<TopResult> > hashed_results;
   bool have_read_restart;
-  bool use_lustre_calls;
-  bool sent_lustre_call_note;
 
   int64_t tick_time,tick_files;
   int64_t complaints,bad_ticks,failed_fstatat;
@@ -658,10 +652,9 @@ void DirWalkState::write_restart(gzFile out) const {
 
 // class DiskUsage: small methods
 
-DiskUsage::DiskUsage(const string &path,const string &restart_path,const string &output_base,bool restart,bool use_lustre_calls):
+DiskUsage::DiskUsage(const string &path,const string &restart_path,const string &output_base,bool restart):
   topdir(path), restart_path(restart_path), output_base(output_base),
-  have_read_restart(false),use_lustre_calls(use_lustre_calls),
-  sent_lustre_call_note(false),
+  have_read_restart(false),
   tick_time(0),tick_files(0),complaints(0),bad_ticks(0),failed_fstatat(0)
 {
   start_time=time(NULL);
@@ -915,49 +908,24 @@ DirResult DiskUsage::tree_walk(const string &reldir,const string &path,
         sub_tr->write_content(output_base+dent->d_name+".du.gz");
       }
     } else {
-      bool use_mdc_getfileinfo=use_lustre_calls;
-      int64_t file_size=0,file_blocks=0; // IOC_MDC_GETFILEINFO
-      if(use_mdc_getfileinfo) {
-        if(!sent_lustre_call_note) {
-          info("note: will use LL_IOC_MDC_GETINFO to get file sizes.\n");
-          sent_lustre_call_note=true;
-        }
-        const size_t max_fileinfo_buffer_size = 
-          sizeof(lstat_t) + sizeof(struct lov_user_md_v3)
-          + sizeof(struct lov_mds_md_v3) + MAX_LOV_UUID_COUNT*sizeof(struct lov_ost_data_v1) + 5000;
-        char buffer[max_fileinfo_buffer_size]={0};
-        struct lov_user_mds_data *fileinfo=(struct lov_user_mds_data *)buffer;
-        strncpy(buffer, dent->d_name, max(sizeof(struct lov_user_mds_data),sizeof(dent->d_name)));
-        if(ioctl(dirfd(dir), LL_IOC_MDC_GETINFO, (void *)fileinfo)) {
-          error("warning: %s/%s: LL_IOC_MDC_GETINFO failed; will use fstatat: %s\n",path.c_str(),dent->d_name,strerror(errno));
-          use_mdc_getfileinfo=false; // failed; fall back go fstatat
-        } else {
-          file_size=fileinfo->lmd_st.st_size;
-          file_size=fileinfo->lmd_st.st_blocks;
-        }
-      }
-      if(!use_mdc_getfileinfo) {
-        struct stat sb;
-        if(fstatat(dirfd(dir),dent->d_name,&sb,AT_SYMLINK_NOFOLLOW)) {
-          warning("warning: %s/%s: cannot fstatat; will ignore: %s\n",path.c_str(),dent->d_name,strerror(errno));
-          failed_fstatat++;
-          continue;
-        }
-        file_size=sb.st_size;
-        file_blocks=sb.st_blocks;
+      struct stat sb;
+      if(fstatat(dirfd(dir),dent->d_name,&sb,AT_SYMLINK_NOFOLLOW)) {
+        warning("warning: %s/%s: cannot fstatat; will ignore: %s\n",path.c_str(),dent->d_name,strerror(errno));
+        failed_fstatat++;
+        continue;
       }
 
-      state[walk_index].add(file_size,file_blocks,1);
+      state[walk_index].add(sb.st_size,sb.st_blocks,1);
       tick_files++;
 
       if(walk_index==0 && !skip) {
         // Top level result entry for a file
         shared_ptr<TopResult> result=result_for(dent->d_name);
-        result->add(file_size,file_blocks,1);
+        result->add(sb.st_size,sb.st_blocks,1);
         result->set_finish_time();
       }
 
-      tr->add(file_size,file_blocks,1);
+      tr->add(sb.st_size,sb.st_blocks,1);
     }
 
     if(should_write_restart()) {
@@ -1012,15 +980,14 @@ void usage() {
   error("SYNTAX: lustre-disk-usage [-f] [-d done_file] [-o report_file] [-m rate] [-r] [-q] [-v] [-t restart_interval] /path/to/dir /path/to/restart.gz /string/prepended/to/output\n"
         "Analyzes disk usage in a project within a Lustre filesystem.\n"
         "\n"
-        "  -d done_file = write this file upon successful exit. Do not start if this file exists.\n"
         "  -f = if the done_file exists, delete it and run anyway.\n"
+        "  -d done_file = write this file upon successful exit. Do not start if this file exists.\n"
         "  -o report_file = write the text report table to this file instead of stdout\n"
-        "  -t restart_interval = write restart files this often (seconds; minimum 10)\n"
+        "  -m rate = minimum files per second before triggering an exit (real value).\n"
         "  -r = restart from the /path/to/restart.gz file if possible, otherwise start over.\n"
         "  -q = be quiet; only prints errors and warnings.\n"
         "  -v = be extremely verbose; only useful for debugging.\n"
-        "  -l = get file sizes from the lustre metadata server.\n"
-        "  -m rate = minimum files per second before triggering an exit (real value).\n"
+        "  -t restart_interval = write restart files this often (seconds; minimum 10)\n"
         "\n"
         "/path/to/dir = the directory whose usage you want\n"
         "/path/to/restart.gz = name of the gzipped restart file\n"
@@ -1028,13 +995,12 @@ void usage() {
 }
 
 int main(int argc,char **argv) {
-  bool restart=false,force=false,scrub_restart=true,use_lustre_calls=false;
+  bool restart=false,force=false,scrub_restart=true;
   string done_file,report_file;
 
   int opt;
   while( (opt=getopt(argc,argv,"lfrqvd:t:o:m:")) != -1 ) {
     switch(opt) {
-    case 'l':     use_lustre_calls=true;                break;
     case 'r':     restart=true;                         break;
     case 'f':     force=true;                           break;
     case 'q':     be_quiet();                           break;
@@ -1078,7 +1044,7 @@ int main(int argc,char **argv) {
   if(restart)
     info("Restart from %s\n",argv[optind+1]);
 
-  DiskUsage du(input_path,restart_path,output_prepend,restart,use_lustre_calls);
+  DiskUsage du(input_path,restart_path,output_prepend,restart);
   DirResult result=du.tree_walk();
   int64_t elapsed=above_int(du.time_elapsed(),1);
 
