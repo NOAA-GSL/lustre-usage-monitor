@@ -7,9 +7,11 @@ module load rocoto/squeue-last-job-workaround
 
 set -e
 
+mkdir -p "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}"
 cd "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}"
+mkdir -p out out/reports
 
-echo "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}" > topdir.ent
+echo -n "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}" > topdir.ent
 
 areas=( $( cat hera-disk-areas.lst ) )
 echo " " ${areas[@]} | sed 's, /, ,g ; s,/,--,g' > dir-entity-list.ent

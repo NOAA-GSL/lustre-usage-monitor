@@ -3,7 +3,7 @@
 <!DOCTYPE workflow [
 <!ENTITY TOPDIR SYSTEM "./topdir.ent">
 <!ENTITY OUTDIR "&TOPDIR;/out">
-<!ENTITY DISK_USAGE_PROGRAM "&TOPDIR;/lustre-disk-usage.exe">
+<!ENTITY DISK_USAGE_PROGRAM "&TOPDIR;/lustre-disk-usage/lustre-disk-usage.exe">
 <!ENTITY REPORT_SCRIPT "&TOPDIR;/final_report.sh">
 <!ENTITY XML_SCRIPT "&TOPDIR;/report_to_xml.pl">
 <!ENTITY REPORT "&OUTDIR;/report.txt">

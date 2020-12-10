@@ -15,7 +15,7 @@ set -e
 
 cd "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}"
 
-echo "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}" > topdir.ent
+echo -n "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}" > topdir.ent
 
 areas=( $( cat disk-areas.lst ) )
 echo " " ${areas[@]} | sed 's, /, ,g ; s,/,--,g' > dir-entity-list.ent
