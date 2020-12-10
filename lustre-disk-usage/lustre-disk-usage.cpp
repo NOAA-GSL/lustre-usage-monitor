@@ -854,8 +854,16 @@ DirResult DiskUsage::tree_walk(const string &reldir,const string &path,
       state[walk_index].mark_done(sub_reldir);
       state[walk_index]+=result;
       if(walk_index==0) {
+        string filename = output_base+sub_reldir+".du.gz";
         *tr += result;
-        sub_tr->write_content(output_base+sub_reldir+".du.gz");
+        try {
+          sub_tr->write_content(filename);
+        } catch(const FileError &fe) {
+          error("ERROR: %s: %s\n",filename.c_str(),fe.what());
+          error("ERROR: Cannot write output files in run area. This is an unrecoverable error.\n");
+          error("ERROR: Potential existential crisis: did the disk usage monitor run out of disk space?\n");
+          exit(2);
+        }
       }
     } else
       write_restart();
@@ -904,8 +912,16 @@ DirResult DiskUsage::tree_walk(const string &reldir,const string &path,
       DirResult result=tree_walk(dent->d_name,substr,-1,sub_tr,false);
       state[walk_index]+=result;
       if(walk_index==0) {
+        string filename=output_base+dent->d_name+".du.gz";
         *tr += result;
-        sub_tr->write_content(output_base+dent->d_name+".du.gz");
+        try {
+          sub_tr->write_content(filename);
+        } catch(const FileError &fe) {
+          error("ERROR: %s: %s\n",filename.c_str(),fe.what());
+          error("ERROR: Cannot write output files in run area. This is an unrecoverable error.\n");
+          error("ERROR: Potential existential crisis: did the disk usage monitor run out of disk space?\n");
+          exit(2);
+        }
       }
     } else {
       struct stat sb;
