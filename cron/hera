@@ -1,4 +1,4 @@
 USAGE_MONITOR=/home/Samuel.Trahan/lustre-usage-monitor
 */10 * * * * /home/Samuel.Trahan/lustre-usage-monitor/scripts/hera-1day-rocoto.sh
 3 * * * * /home/Samuel.Trahan/lustre-usage-monitor/scripts/move-root-files.sh
-*/5 * * * * /home/Samuel.Trahan/lustre-usage-monitor/scripts/rm-usage-tmp.bash
+*/5 * * * * /home/Samuel.Trahan/lustre-usage-monitor/scripts/rm-usage-tmp.bash > /dev/null 2>&1

@@ -1,6 +1,6 @@
 USAGE_MONITOR=/home/Samuel.Trahan/lustre-usage-monitor
 3 * * * * /home/Samuel.Trahan/lustre-usage-monitor/scripts/move-root-files.sh
-*/5 * * * * /home/Samuel.Trahan/lustre-usage-monitor/scripts/rm-usage-tmp.bash
+*/5 * * * * /home/Samuel.Trahan/lustre-usage-monitor/scripts/rm-usage-tmp.bash > /dev/null 2>&1
 */20 * * * * /home/Samuel.Trahan/lustre-usage-monitor/scripts/jet-2day-rocoto.sh
 */29 * * * * /home/Samuel.Trahan/lustre-usage-monitor/scripts/cache-rocoto-sacct-command.sh > /dev/null 2>&1
 7,37 * * * * /usr/bin/find /home/Samuel.Trahan/sacct-cache -name 'tmp.*'  -and -mmin +90 -delete
