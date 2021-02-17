@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+  
+<!DOCTYPE workflow [
+<!ENTITY TOPDIR SYSTEM "./topdir.ent">
+<!ENTITY OUTDIR "&TOPDIR;/out">
+<!ENTITY DISK_USAGE_PROGRAM "&TOPDIR;/lustre-disk-usage/lustre-disk-usage.exe">
+<!ENTITY REPORT_SCRIPT "&TOPDIR;/scripts/final_report.sh">
+<!ENTITY XML_SCRIPT "&TOPDIR;/scripts/report_to_xml.pl">
+<!ENTITY REPORT "&OUTDIR;/report.txt">
+<!ENTITY DISK_AREAS "&TOPDIR;/disk-areas.lst">
+<!ENTITY DEADLINE "02:00:15:00">
+<!ENTITY SCRUB_OFFSET "00:08:30:00">
+<!ENTITY SCAN_OFFSET "00:00:15:00">
+<!ENTITY DIRS SYSTEM "./dir-entity-list.ent">
+<!ENTITY CYCLEDEF SYSTEM "./cycledef.ent">
+<!ENTITY SEARCH_DAYS "-4 -3 -2 -1 0 1 2 3 4">
+<!ENTITY ACCOUNT "wrfruc">
+<!ENTITY RESTART_HANG_TIME "2400">
+<!ENTITY RESTART_INTERVAL "120">
+<!ENTITY TOPDIR_ENVAR "<envar><name>USAGE_MONITOR</name><value>&TOPDIR;</value></envar>">
+]>
+
+<workflow realtime="T" scheduler="slurm" taskthrottle="4" cyclethrottle="3" cyclelifespan="02:08:00:00">
+  <log>
+    <cyclestr>&OUTDIR;/@Y@m@d/log/workflow.log</cyclestr>
+  </log>
+  <cycledef>&CYCLEDEF;</cycledef>
+
+  <task name="scrub" maxtries="3">
+    <queue>batch</queue>
+    <walltime>00:15:00</walltime>
+    <account>&ACCOUNT;</account>
+    <cores>1</cores>
+    <command>set -x ; rm -rf <cyclestr offset="-16:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-14:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-12:00:00:00">&OUTDIR;/@Y@m@d</cyclestr></command>
+    <join><cyclestr>&OUTDIR;/@Y@m@d/log/scrub.log</cyclestr></join>
+    &TOPDIR_ENVAR;
+    <dependency>
+        <timedep><cyclestr offset="&SCRUB_OFFSET;">@Y@m@d@H@M@S</cyclestr></timedep>
+    </dependency>
+  </task>
+
+  <metatask name="du">
+    <var name="dir">&DIRS;</var>
+    <task name="#dir#" maxtries="14">
+      <queue>batch</queue>
+      <walltime>06:00:00</walltime>
+      <account>&ACCOUNT;</account>
+      <cores>1</cores>
+      <native>--partition=orion</native>
+      <command><cyclestr>set -x ; ulimit -c 0 ; cd "&OUTDIR;/@Y@m@d" ; mkdir "#dir#" ; &DISK_USAGE_PROGRAM; -t "&RESTART_INTERVAL;" -d "#dir#.done" -r `echo /"#dir#" | sed s,--,/,g`  "#dir#.rst.gz" "#dir#/" -o "#dir#.txt"</cyclestr></command>
+      <join><cyclestr>&OUTDIR;/@Y@m@d/log/#dir#.log</cyclestr></join>
+      &TOPDIR_ENVAR;
+      <dependency>
+        <timedep><cyclestr offset="&SCAN_OFFSET;">@Y@m@d@H@M@S</cyclestr></timedep>
+      </dependency>
+      <hangdependency>
+        <or>
+          <not>
+            <datadep><cyclestr>&OUTDIR;/@Y@m@d/#dir#.rst.gz</cyclestr></datadep>
+          </not>
+          <datadep age="&RESTART_HANG_TIME;"><cyclestr>&OUTDIR;/@Y@m@d/#dir#.rst.gz</cyclestr></datadep>
+        </or>
+      </hangdependency>
+      <!-- This would actually delete the job output, causing it to rerun from the beginning. -->
+      <!-- It takes a day or more to run some jobs, so that should only be done manually. -->
+      <!-- <rewind> -->
+      <!--   <sh><cyclestr>rm -f "&OUTDIR;/@Y@m@d/#dir#."* ; rm -rf "&OUTDIR;/@Y@m@d/#dir#"</cyclestr></sh> -->
+      <!-- </rewind> -->
+    </task>
+  </metatask>
+
+  <task name="report_at_completion" maxtries="3" final="T">
+    <queue>batch</queue>
+    <walltime>00:05:00</walltime>
+    <account>&ACCOUNT;</account>
+    <cores>1</cores>
+    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;" &DIRS; </cyclestr></command>
+    <join><cyclestr>&OUTDIR;/@Y@m@d/log/report.log</cyclestr></join>
+    &TOPDIR_ENVAR;
+    <dependency>
+      <and>
+        <metataskdep metatask="du"></metataskdep>
+        <not><taskdep state="running" task="report_at_time"/></not>
+      </and>
+    </dependency>
+  </task>
+
+  <task name="report_at_time" maxtries="3">
+    <queue>batch</queue>
+    <walltime>00:05:00</walltime>
+    <account>&ACCOUNT;</account>
+    <cores>1</cores>
+    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;" &DIRS; </cyclestr></command>
+    <join><cyclestr>&OUTDIR;/@Y@m@d/log/report.log</cyclestr></join>
+    &TOPDIR_ENVAR;
+    <dependency>
+      <and>
+        <timedep><cyclestr offset="&DEADLINE;">@Y@m@d@H@M@S</cyclestr></timedep>
+        <not><taskdep state="running" task="report_at_completion"/></not>
+      </and>
+    </dependency>
+  </task>
+</workflow>
