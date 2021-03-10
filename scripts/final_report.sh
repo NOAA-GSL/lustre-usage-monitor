@@ -33,26 +33,39 @@ mv "$tmpreport" reports/$YMD.txt
 mv "$tmpxml" reports/$YMD.xml
 ln -sf reports/$YMD.txt report.txt
 ln -sf reports/$YMD.xml report.xml
-if [[ -d /lfs4 ]] ; then
-    /bin/cp -fpL "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}"/out/report.txt /lfs1/BMC/rtfim/disk-usage/jet.txt
-elif [[ -d /scratch1/NCEPDEV ]] ; then
-    scp "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}"/out/report.txt jetscp.rdhpcs.noaa.gov:/lfs1/BMC/rtfim/disk-usage/hera.txt
-else
-    dirname=report.$$.$RANDOM.$RANDOM
+
+update_github_txt() {
+    set -uxe
+    local dirname="$1"
+    local system="$2"
+    cd "$dirname"
+    if ( ! cmp ../report.txt $system.txt ) ; then
+        cat ../report.txt > $system.txt
+        git add $system.txt
+        git commit -m "$system disk usage report $YMD completed at $( date )"
+        git push origin master
+    fi
+}
+
+github_deliver() {
+    local dirname=report.$$.$RANDOM.$RANDOM
+    local system="$1"
     git clone --branch master ssh://git@github.com/SamuelTrahanNOAA/usage-reports "$dirname"
     set +e
-    update_orion_txt() {
-        set -uxe
-        cd "$dirname"
-        if ( ! cmp ../report.txt orion.txt ) ; then
-            cat ../report.txt > orion.txt
-            git add orion.txt
-            git commit -m "Orion disk usage report $YMD completed at $( date )"
-            git push origin master
-        fi
-    }
-    ( update_orion_txt )
+    ( update_github_txt "$dirname" "$system" )
     success=$?
     rm -rf "$dirname"
     exit $success
+}
+
+if [[ -d /lfs4 ]] ; then
+    /bin/cp -fpL "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}"/out/report.txt /lfs1/BMC/rtfim/disk-usage/jet.txt
+    system=jet
+elif [[ -d /scratch1/NCEPDEV ]] ; then
+    #scp "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}"/out/report.txt jetscp.rdhpcs.noaa.gov:/lfs1/BMC/rtfim/disk-usage/hera.txt
+    system=hera
+else
+    system=orion
 fi
+
+github_deliver "$system" # exits script
