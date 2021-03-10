@@ -35,6 +35,24 @@ ln -sf reports/$YMD.txt report.txt
 ln -sf reports/$YMD.xml report.xml
 if [[ -d /lfs4 ]] ; then
     /bin/cp -fpL "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}"/out/report.txt /lfs1/BMC/rtfim/disk-usage/jet.txt
-else
+elif [[ -d /scratch1/NCEPDEV ]] ; then
     scp "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}"/out/report.txt jetscp.rdhpcs.noaa.gov:/lfs1/BMC/rtfim/disk-usage/hera.txt
+else
+    dirname=report.$$.$RANDOM.$RANDOM
+    git clone --branch master ssh://git@github.com/SamuelTrahanNOAA/usage-reports "$dirname"
+    set +e
+    update_orion_txt() {
+        set -uxe
+        cd "$dirname"
+        if ( ! cmp ../report.txt orion.txt ) ; then
+            cat ../report.txt > orion.txt
+            git add orion.txt
+            git commit -m "Orion disk usage report $YMD completed at $( date )"
+            git push origin master
+        fi
+    }
+    ( update_orion_txt )
+    success=$?
+    rm -rf "$dirname"
+    exit $success
 fi
