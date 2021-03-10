@@ -14,13 +14,13 @@
 <!ENTITY DIRS SYSTEM "./dir-entity-list.ent">
 <!ENTITY CYCLEDEF SYSTEM "./cycledef.ent">
 <!ENTITY SEARCH_DAYS "-4 -3 -2 -1 0 1 2 3 4">
-<!ENTITY ACCOUNT "wrfruc">
+<!ENTITY ACCOUNT "zrtrr">
 <!ENTITY RESTART_HANG_TIME "2400">
 <!ENTITY RESTART_INTERVAL "120">
 <!ENTITY TOPDIR_ENVAR "<envar><name>USAGE_MONITOR</name><value>&TOPDIR;</value></envar>">
 ]>
 
-<workflow realtime="T" scheduler="slurm" taskthrottle="4" cyclethrottle="3" cyclelifespan="02:08:00:00">
+<workflow realtime="T" scheduler="slurm" taskthrottle="5" cyclethrottle="3" cyclelifespan="02:08:00:00">
   <log>
     <cyclestr>&OUTDIR;/@Y@m@d/log/workflow.log</cyclestr>
   </log>
@@ -43,7 +43,7 @@
     <var name="dir">&DIRS;</var>
     <task name="#dir#" maxtries="14">
       <queue>batch</queue>
-      <walltime>06:00:00</walltime>
+      <walltime>03:00:00</walltime>
       <account>&ACCOUNT;</account>
       <cores>1</cores>
       <native>--partition=orion</native>
@@ -74,6 +74,7 @@
     <walltime>00:05:00</walltime>
     <account>&ACCOUNT;</account>
     <cores>1</cores>
+    <native>--partition=service</native>
     <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;" &DIRS; </cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/report.log</cyclestr></join>
     &TOPDIR_ENVAR;
@@ -90,6 +91,7 @@
     <walltime>00:05:00</walltime>
     <account>&ACCOUNT;</account>
     <cores>1</cores>
+    <native>--partition=service</native>
     <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;" &DIRS; </cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/report.log</cyclestr></join>
     &TOPDIR_ENVAR;
