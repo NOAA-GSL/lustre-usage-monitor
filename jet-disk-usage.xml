@@ -70,7 +70,7 @@
   </metatask>
 
   <task name="report_at_completion" maxtries="3" final="T">
-    <queue>batch</queue>
+    <partition>service</partition>
     <walltime>00:05:00</walltime>
     <account>&ACCOUNT;</account>
     <cores>1</cores>
@@ -86,7 +86,7 @@
   </task>
 
   <task name="report_at_time" maxtries="3">
-    <queue>batch</queue>
+    <partition>service</partition>
     <walltime>00:05:00</walltime>
     <account>&ACCOUNT;</account>
     <cores>1</cores>
