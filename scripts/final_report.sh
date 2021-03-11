@@ -4,7 +4,7 @@ set -xue
 
 YMD="$1"
 report_to_xml="$2"
-ago="$3"
+agos="$3"
 # ago jet: $( seq -4 1 4 )
 # ago hera: $( seq 0 3 )
 shift 3
@@ -15,7 +15,7 @@ tmpreport=reports/$YMD.txt-$$.tmp
 echo "Project Directory             Sub-Directory           Dir Use (TB)  Dir Quota (%)   Dir Quota (TB)      Last Checked" > "$tmpreport"
 echo >> "$tmpreport"
 for area in "$@" ; do
-    for ago in $ago ; do
+    for ago in $agos ; do
         dir=$( date +%Y%m%d -d "$ago days ago" )
         donefile="$dir/$area.done"
         txtfile="$dir/$area.txt"
