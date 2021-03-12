@@ -41,12 +41,12 @@
 
   <metatask name="du">
     <var name="dir">&DIRS;</var>
-    <task name="#dir#" maxtries="8">
+    <task name="#dir#" maxtries="15">
       <queue>batch</queue>
       <walltime>03:00:00</walltime>
       <account>&ACCOUNT;</account>
       <cores>1</cores>
-      <command><cyclestr>set -x ; ulimit -c 0 ; cd "&OUTDIR;/@Y@m@d" ; mkdir "#dir#" ; &DISK_USAGE_PROGRAM; -t "&RESTART_INTERVAL;" -d "#dir#.done" -r `echo /"#dir#" | sed s,--,/,g`  "#dir#.rst.gz" "#dir#/" -o "#dir#.txt"</cyclestr></command>
+      <command><cyclestr>set -x ; ulimit -c 0 ; cd "&OUTDIR;/@Y@m@d" ; mkdir "#dir#" ; &DISK_USAGE_PROGRAM; -i -t "&RESTART_INTERVAL;" -d "#dir#.done" -r `echo /"#dir#" | sed s,--,/,g`  "#dir#.rst.gz" "#dir#/" -o "#dir#.txt"</cyclestr></command>
       <join><cyclestr>&OUTDIR;/@Y@m@d/log/#dir#.log</cyclestr></join>
       &TOPDIR_ENVAR;
       <dependency>

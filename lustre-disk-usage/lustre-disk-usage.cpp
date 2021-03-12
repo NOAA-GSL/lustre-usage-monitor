@@ -235,6 +235,7 @@ static int g_verbose=0;
 static int64_t g_restart_interval=300;
 static double g_min_files_per_second=0.1;
 static time_t g_bad_node_sleep_time=120;
+static bool g_ignore_failed_fstatat=false;
 
 ////////////////////////////////////////////////////////////////////////
 
@@ -927,7 +928,8 @@ DirResult DiskUsage::tree_walk(const string &reldir,const string &path,
       struct stat sb;
       if(fstatat(dirfd(dir),dent->d_name,&sb,AT_SYMLINK_NOFOLLOW)) {
         warning("warning: %s/%s: cannot fstatat; will ignore: %s\n",path.c_str(),dent->d_name,strerror(errno));
-        failed_fstatat++;
+        if(!g_ignore_failed_fstatat)
+          failed_fstatat++;
         continue;
       }
 
@@ -1004,6 +1006,7 @@ void usage() {
         "  -q = be quiet; only prints errors and warnings.\n"
         "  -v = be extremely verbose; only useful for debugging.\n"
         "  -t restart_interval = write restart files this often (seconds; minimum 10)\n"
+        "  -i = do not abort due to large numbers of failed fstatat calls (needed on Hera scratch1)\n"
         "\n"
         "/path/to/dir = the directory whose usage you want\n"
         "/path/to/restart.gz = name of the gzipped restart file\n"
@@ -1015,7 +1018,7 @@ int main(int argc,char **argv) {
   string done_file,report_file;
 
   int opt;
-  while( (opt=getopt(argc,argv,"lfrqvd:t:o:m:")) != -1 ) {
+  while( (opt=getopt(argc,argv,"ilfrqvd:t:o:m:")) != -1 ) {
     switch(opt) {
     case 'r':     restart=true;                         break;
     case 'f':     force=true;                           break;
@@ -1026,6 +1029,7 @@ int main(int argc,char **argv) {
     case 's':     scrub_restart=false;                  break;
     case 'o':     report_file=optarg;                   break;
     case 'm':     g_min_files_per_second=atof(optarg);  break;
+    case 'i':     g_ignore_failed_fstatat=true;         break;
     default:
       usage();
       return 2;
