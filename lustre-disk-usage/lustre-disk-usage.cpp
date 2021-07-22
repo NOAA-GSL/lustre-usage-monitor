@@ -523,7 +523,13 @@ GzFileHandler::GzFileHandler(const string &path,const string &tempfile,const str
 GzFileHandler::~GzFileHandler() {
   try {
     close();
-  } catch(...) {}
+  } catch(const ZlibFailed &z) {
+    error("ERROR: failed to close a gzlib file: %s\n",z.what());
+  } catch(const bad_alloc &b) {
+    error("ERROR: bad_alloc; ran out of memory\n");
+  } catch(...) {
+    error("Uncaught C++ exception.\n");
+  }
 }
 
 void GzFileHandler::close() {
