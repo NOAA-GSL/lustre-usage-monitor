@@ -50,7 +50,7 @@ update_github_txt() {
 github_deliver() {
     local dirname=report.$$.$RANDOM.$RANDOM
     local system="$1"
-    git clone --branch master ssh://git@github.com/SamuelTrahanNOAA/usage-reports "$dirname"
+    git clone --branch master ssh://git@github.com/NOAA-GSL/usage-reports "$dirname"
     set +e
     ( update_github_txt "$dirname" "$system" )
     success=$?
