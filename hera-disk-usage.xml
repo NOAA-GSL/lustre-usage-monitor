@@ -8,11 +8,13 @@
 <!ENTITY XML_SCRIPT "&TOPDIR;/scripts/report_to_xml.pl">
 <!ENTITY REPORT "&OUTDIR;/report.txt">
 <!ENTITY DISK_AREAS "&TOPDIR;/disk-areas.lst">
-<!ENTITY BIG_DISK_AREAS "&TOPDIR;/disk-areas.lst">
+<!ENTITY BIG_DISK_AREAS "&TOPDIR;/big-disk-areas.lst">
 <!ENTITY DEADLINE "00:23:42:00">
 <!ENTITY SCRUB_OFFSET "00:00:30:00">
 <!ENTITY SCAN_OFFSET "00:00:30:00">
 <!ENTITY DIRS SYSTEM "./dir-entity-list.ent">
+<!ENTITY BIG_DIRS SYSTEM "./big-dir-entity-list.ent">
+<!ENTITY ALL_DIRS SYSTEM "./all-dir-entity-list.ent">
 <!ENTITY CYCLEDEF SYSTEM "./cycledef.ent">
 <!ENTITY SEARCH_DAYS "0 1 2 3">
 <!ENTITY ACCOUNT "zrtrr">
@@ -70,8 +72,8 @@
   </metatask>
 
   <metatask name="big_du">
-    <var name="dir">&DIRS;</var>
-    <task name="#dir#" maxtries="15">
+    <var name="dir">&BIG_DIRS;</var>
+    <task name="big_du_#dir#" maxtries="15">
       <queue>batch</queue>
       <walltime>03:00:00</walltime>
       <account>&ACCOUNT;</account>
@@ -104,7 +106,7 @@
     <walltime>00:05:00</walltime>
     <account>&ACCOUNT;</account>
     <cores>1</cores>
-    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;" &DIRS; </cyclestr></command>
+    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;" &ALL_DIRS;</cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/report.log</cyclestr></join>
     &TOPDIR_ENVAR;
     <dependency>
@@ -121,7 +123,7 @@
     <walltime>00:05:00</walltime>
     <account>&ACCOUNT;</account>
     <cores>1</cores>
-    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;" &DIRS; </cyclestr></command>
+    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;" &ALL_DIRS;</cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/report.log</cyclestr></join>
     &TOPDIR_ENVAR;
     <dependency>

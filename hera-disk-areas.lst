@@ -5,6 +5,7 @@
 /scratch1/BMC/gsd-hpcs
 /scratch1/BMC/gsd-fv3
 /scratch1/BMC/gmtb
+/scratch1/BMC/acomp
 /scratch2/BMC/rtrr
 /scratch2/BMC/zrtrr
 /scratch2/BMC/rtruc
@@ -13,3 +14,5 @@
 /scratch1/BMC/zrtrr
 /scratch1/BMC/hmtb
 /scratch2/BMC/gsd-fv3-test
+/scratch2/BMC/ap-fc
+/scratch2/BMC/acomp

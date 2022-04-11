@@ -19,6 +19,8 @@ echo " " ${areas[@]} | sed 's, /, ,g ; s,/,--,g' > dir-entity-list.ent
 bigareas=( $( cat hera-big-disk-areas.lst ) )
 echo " " ${bigareas[@]} | sed 's, /, ,g ; s,/,--,g' > big-dir-entity-list.ent
 
+echo " " ${areas[@]} ${bigareas[@]} | sed 's, /, ,g ; s,/,--,g' > all-dir-entity-list.ent
+
 echo $( date +%Y%m%d0000 -d "7 days ago" ) $( date +%Y%m%d0000 -d "7 days" ) 24:00:00 > cycledef.ent
 
 which rocotorun > /dev/null
