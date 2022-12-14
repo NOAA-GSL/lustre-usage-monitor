@@ -20,7 +20,13 @@ The scripts to run the workflow are:
     scripts/hera-1day-rocoto.sh
     scripts/jet-2day-rocoto.sh
 
-To run it:
+To compile:
+
+export USAGE_MONITOR=/path/to/directory/where/you/cloned/lustre-usage-monitor
+cd $USAGE_MONITOR/lustre-disk-usage
+make
+
+To run it, compile first, and then:
 
 export USAGE_MONITOR=/path/to/directory/where/you/cloned/lustre-usage-monitor
 cd $USAGE_MONITOR
