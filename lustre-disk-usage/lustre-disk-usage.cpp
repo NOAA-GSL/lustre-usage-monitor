@@ -25,6 +25,8 @@ extern "C" {
 #include <lustre/lustreapi.h>
 }
 
+#include <algorithm>
+#include <array>
 #include <exception>
 #include <sstream>
 #include <utility>
@@ -90,26 +92,50 @@ private:
   bool have_tempfile;
 };
 
+struct FileInfo {
+  int64_t bytes, blocks, files;
+  FileInfo(): bytes(0), blocks(0), files(0) {}
+  FileInfo(const FileInfo &o): bytes(o.bytes), blocks(o.blocks), files(o.files) {}
+  FileInfo(std::initializer_list<int64_t> list) {
+    auto it = list.begin();
+    bytes = *it++;
+    blocks = *it++;
+    files = *it++;
+  }
+  FileInfo &operator += (const FileInfo &o) {
+    bytes+=o.bytes;
+    blocks+=o.blocks;
+    files+=o.files;
+    return *this;
+  }
+};
+
 class DirResult {
   // A simple container that tracks the size of a directory
 public:
-  DirResult(int64_t bytes=0, int64_t blocks=0, int64_t files=0);
-  DirResult(gzFile in);
-  DirResult(const DirResult &o): bytes(o.bytes),blocks(o.blocks),files(o.files) {}
+  static const int age_count = 3;
+  static const time_t age_seconds[age_count];
+
+  DirResult() {};
+  //  explicit DirResult(FileInfo f);
+  explicit DirResult(gzFile in);
+  DirResult(const DirResult &o): result(o.result) {}
   void write_restart(gzFile out) const;
   virtual ~DirResult() {}
-  DirResult &add(int64_t bytes=0,int64_t blocks=0,int64_t files=0);
-
-  DirResult &operator += (const DirResult &d) { return add(d.bytes,d.blocks,d.files); }
-public:
-  int64_t bytes, blocks, files;
+  DirResult &add(int age,const FileInfo &fi);
+  FileInfo &at_age(int age) { return result[age]; }
+  const FileInfo &at_age(int age) const { return result[age]; }
+  const array<FileInfo,age_count> &get_result() const { return result; }
+  DirResult &operator += (const DirResult &d);
+private:
+  array<FileInfo,age_count> result;
 };
 
 class TopResult: public DirResult {
   // Tracks the size of a directory AND keeps the du output in an
   // ostringstream.
 public:
-  TopResult(const string &name,const string &out,int64_t bytes=0, int64_t blocks=0, int64_t files=0);
+  TopResult(const string &name,const string &out);
   TopResult(gzFile in);
   void write_restart(gzFile out) const;
   void write_content(const string &filename);
@@ -130,8 +156,7 @@ class DirWalkState: public DirResult {
   // Tracks the size of a directory, its name, and the list of
   // subdirectories already processed.
 public:
-  DirWalkState(const string &reldir,const string &path,
-               int64_t bytes=0, int64_t blocks=0, int64_t files=0);
+  DirWalkState(const string &reldir,const string &path);
   DirWalkState(gzFile in);
   void write_restart(gzFile out) const;
 
@@ -150,7 +175,7 @@ private:
 class DiskUsage {
 public:
   DiskUsage(const string &path,const string &restart_file,const string &output_base,bool restart=false);
-  void insert_unseen(int64_t total_usage,const string &name);
+  void insert_unseen(int64_t total_usage,int64_t total_files,const string &name);
   DirResult tree_walk();
   int64_t time_elapsed() const;
   void sort_results_by_size();
@@ -161,6 +186,7 @@ public:
   iterator results_end() { return ordered_results.end(); }
   const_iterator results_end() const { return ordered_results.end(); }
   const string &top_dir() const { return topdir; }
+  shared_ptr<const TopResult> result_for(const string &name) const;
 private:
   DirResult tree_walk(const string &reldir,const string &path,int walk_index,shared_ptr<TopResult>,bool restart);
   shared_ptr<TopResult> result_for(const string &name);
@@ -241,7 +267,7 @@ static bool g_ignore_failed_fstatat=false;
 
 // Functions
 
-bool get_quota_info(const string &path,int64_t &size,int64_t &softlimit) {
+bool get_quota_info(const string &path,int64_t &size,int64_t &softlimit,int64_t &files,int64_t &file_softlimit) {
   string real_path=strrealpath(path.c_str());
 
   if(!real_path.size())
@@ -279,6 +305,8 @@ bool get_quota_info(const string &path,int64_t &size,int64_t &softlimit) {
 
   softlimit=static_cast<int64_t>(1024ll*qctl.qc_dqblk.dqb_bsoftlimit);
   size=static_cast<int64_t>(qctl.qc_dqblk.dqb_curspace);
+  file_softlimit=static_cast<int64_t>(1024ll*qctl.qc_dqblk.dqb_isoftlimit);
+  files=static_cast<int64_t>(qctl.qc_dqblk.dqb_curinodes);
   return true;
 }
 
@@ -449,7 +477,7 @@ string strstrftime(const char *format,const struct tm *tm) {
   return string(buf);
 }
 
-bool write_report(const string &where,const DiskUsage &du,int64_t curspace,int64_t softlimit) {
+bool write_report(const string &where,const DiskUsage &du,int64_t curspace,int64_t softlimit,int64_t curfiles,int64_t fsoftlimit,bool short_report) {
   FILE *tgt=stdout;
   string tempfile("(*stdout*)");
   bool have_tempfile=false;
@@ -464,10 +492,24 @@ bool write_report(const string &where,const DiskUsage &du,int64_t curspace,int64
     }
   }
 
-  if(0>=fprintf(tgt,"%-44s\t\t%5.1f\t\t%5.1f%%\t\t%5.1f\t\t%s\n",
-                strrealpath(du.top_dir()).c_str(),
-                double(curspace)/1048576.0/1048576,max(0.0,double(curspace)/softlimit*100),
-                double(softlimit)/1048576.0/1048576,strstrftime("%a %d %b %Y %T %Z").c_str())) {
+  shared_ptr<const TopResult> dot = du.result_for(".");
+  int result;
+  if(short_report)
+    result=fprintf(tgt,"%-44s\t\t%5.1f\t\t%5.1f%%\t\t%5.1f\t\t%s\n",
+                   strrealpath(du.top_dir()).c_str(),
+                   double(curspace)/1048576.0/1048576,max(0.0,double(curspace)/softlimit*100),
+                   double(softlimit)/1048576.0/1048576,strstrftime("%a %d %b %Y %T %Z").c_str());
+  else
+    result=fprintf(tgt,"%-44s\t\t%5.1f\t\t%5.1f%%\t\t%5.1f\t\t%s\t%8.1f\t%8.1f\t%10lld\t%8.1f%%\t%lld\n",
+                   strrealpath(du.top_dir()).c_str(),
+                   double(curspace)/1048576.0/1048576,max(0.0,double(curspace)/softlimit*100),
+                   double(softlimit)/1048576.0/1048576,strstrftime("%a %d %b %Y %T %Z").c_str(),
+                   dot->at_age(1).bytes/1048576.0/1048576,
+                   dot->at_age(2).bytes/1048576.0/1048576,
+                   static_cast<long long int>(curfiles),
+                   max(0.0,double(curfiles)/max(1.0,double(fsoftlimit))*100),
+                   static_cast<long long int>(fsoftlimit));
+  if(result<=0) {
     error("%s: cannot write data: %s",tempfile.c_str(),strerror(errno));
     if(have_tempfile) unlink(tempfile.c_str());
     if(tgt) fclose(tgt);
@@ -483,9 +525,19 @@ bool write_report(const string &where,const DiskUsage &du,int64_t curspace,int64
     if(!gmtime_r(&at_t,&at_tm))
       memset(&at_tm,0,sizeof(tm));
     string at=strstrftime("%a %d %b %Y %T %Z",&at_tm);
-    if(0>=fprintf(tgt,"%-43s \t\t%5.1f\t\t%5.1f%%\t\t\t\t%s\n",
-                  name.c_str(),(*it)->bytes/1048576.0/1048576,
-                  max(0.0,double((*it)->bytes)/softlimit)*100,at.c_str())) {
+    if(short_report)
+      fprintf(tgt,"%-43s \t\t%5.1f\t\t%5.1f%%\t\t\t\t%s\n",
+              name.c_str(),(*it)->at_age(0).bytes/1048576.0/1048576,
+              max(0.0,double((*it)->at_age(0).bytes)/softlimit)*100,at.c_str());
+    else
+      fprintf(tgt,"%-43s \t\t%5.1f\t\t%5.1f%%\t\t\t\t%s\t%8.1f\t%8.1f\t%10lld\t%8.1f%%\n",
+              name.c_str(),(*it)->at_age(0).bytes/1048576.0/1048576,
+              max(0.0,double((*it)->at_age(0).bytes)/softlimit)*100,at.c_str(),
+              (*it)->at_age(1).bytes/1048576.0/1048576,
+              (*it)->at_age(2).bytes/1048576.0/1048576,
+              static_cast<long long int>((*it)->at_age(0).files),
+              max(0.0,double(curfiles)/max(1.0,double(fsoftlimit))*100));
+    if(result<=0) {
       error("%s: cannot write data: %s\n",tempfile.c_str(),strerror(errno));
       if(have_tempfile) unlink(tempfile.c_str());
       if(tgt) fclose(tgt);
@@ -561,28 +613,34 @@ void GzFileHandler::close() {
 
 // Class DirResult
 
-DirResult::DirResult(int64_t bytes, int64_t blocks, int64_t files):
-  bytes(bytes), blocks(blocks), files(files)
-{}
+// File ages to track in seconds. Negative numbers means "all ages." Must be monotonically increasing.
+const time_t DirResult::age_seconds[DirResult::age_count] = { -1, 7776000, 15552000 };
 
-DirResult::DirResult(gzFile in):
-  bytes(0), blocks(0), files(0)
+DirResult::DirResult(gzFile in)
 {
-  ezread(in,(char *)&bytes,8);
-  ezread(in,(char *)&blocks,8);
-  ezread(in,(char *)&files,8);
+  for(auto &bbf : result) {
+    ezread(in,(char *)&bbf.bytes,8);
+    ezread(in,(char *)&bbf.blocks,8);
+    ezread(in,(char *)&bbf.files,8);
+  }
 }
 
 void DirResult::write_restart(gzFile out) const {
-  ezwrite(out,(const char *)&bytes,8);
-  ezwrite(out,(const char *)&blocks,8);
-  ezwrite(out,(const char *)&files,8);
+  for(auto &bbf : result) {
+    ezwrite(out,(const char *)&bbf.bytes,8);
+    ezwrite(out,(const char *)&bbf.blocks,8);
+    ezwrite(out,(const char *)&bbf.files,8);
+  }
 }
 
-DirResult &DirResult::add(int64_t add_bytes,int64_t add_blocks,int64_t add_files) {
-  bytes+=add_bytes;
-  blocks+=add_blocks;
-  files+=add_files;
+DirResult &DirResult::add(int age, const FileInfo &toAdd) {
+  result[age] += toAdd;
+  return *this;
+}
+
+DirResult &DirResult::operator += (const DirResult &d) {
+  for(int i=0; i<age_count; ++i)
+    result[i] += d.result[i];
   return *this;
 }
 
@@ -590,8 +648,8 @@ DirResult &DirResult::add(int64_t add_bytes,int64_t add_blocks,int64_t add_files
 
 // Class TopResult
 
-TopResult::TopResult(const string &name,const string &out,int64_t bytes, int64_t blocks, int64_t files):
-  DirResult(bytes,blocks,files),name(name),finish_time(-1)
+TopResult::TopResult(const string &name,const string &out):
+  DirResult(),name(name),finish_time(-1)
 {
   content<<out;
 }
@@ -625,9 +683,8 @@ void TopResult::write_content(const string &filename) {
 
 // Class DirWalkState
 
-DirWalkState::DirWalkState(const string &reldir,const string &path,
-                           int64_t bytes, int64_t blocks, int64_t files):
-  DirResult(bytes,blocks,files), reldir(reldir), path(path), done()
+DirWalkState::DirWalkState(const string &reldir,const string &path):
+  DirResult(), reldir(reldir), path(path), done()
 {}
 
 DirWalkState::DirWalkState(gzFile in):
@@ -686,6 +743,13 @@ shared_ptr<TopResult> DiskUsage::result_for(const string &name) {
   return ordered_results.back();
 }
 
+shared_ptr<const TopResult> DiskUsage::result_for(const string &name) const {
+  auto there=hashed_results.find(name);
+  if(there!=hashed_results.end() && there->second)
+    return there->second;
+  return nullptr;
+}
+
 void DiskUsage::clear() {
   start_time=time(NULL);
   last_restart_write=start_time;
@@ -699,25 +763,29 @@ int64_t DiskUsage::time_elapsed() const {
   return end_time-start_time;
 }
 
-void DiskUsage::insert_unseen(int64_t total_usage,const string &name) {
+void DiskUsage::insert_unseen(int64_t total_usage,int64_t total_files,const string &name) {
   int64_t total_seen=0;
+  int64_t total_fseen=0;
   for(auto it=ordered_results.begin();it!=ordered_results.end();it++) {
     if((*it)->get_name()== ".")
       continue;
-    total_seen += (*it)->bytes;
+    total_seen += (*it)->at_age(0).bytes;
+    total_fseen += (*it)->at_age(0).files;
   }
   int64_t unseen=above_int(total_usage-total_seen,0);
+  int64_t funseen=above_int(total_files-total_fseen,0);
   shared_ptr<TopResult> tr=result_for(name);
-  tr->add(unseen,(unseen+511)/512,0);
+  tr->add(0, {unseen,(unseen+511)/512,funseen});
   tr->set_finish_time();
   sort_results_by_size();
-  debug("unseen = %lld = (%lld - %lld)\n",(long long)tr->bytes,(long long)total_usage,(long long)total_seen);
+  debug("unseen = %lld = (%lld - %lld)\n",(long long)tr->at_age(0).bytes,(long long)total_usage,(long long)total_seen);
+  debug("funseen = %lld = (%lld - %lld)\n",(long long)tr->at_age(0).files,(long long)total_files,(long long)total_fseen);
 }
 
 DirResult DiskUsage::tree_walk() {
   end_time=time(NULL);
   int walk_index=state.empty() ? -1 : 0;
-  DirResult result=tree_walk(topdir,topdir,walk_index,result_for("."),have_read_restart);
+  DirResult result=tree_walk(".",topdir,walk_index,result_for("."),have_read_restart);
   end_time=time(NULL);
   sort_results_by_size();
   return result;
@@ -730,7 +798,7 @@ bool DiskUsage::should_write_restart() const {
 void DiskUsage::sort_results_by_size() {
   stable_sort(ordered_results.begin(),ordered_results.end(),
               [](const shared_ptr<TopResult> &left,const shared_ptr<TopResult> &right) {
-                return right->bytes<left->bytes;
+                return right->at_age(0).bytes<left->at_age(0).bytes;
               });
 }
 
@@ -839,6 +907,7 @@ void DiskUsage::read_restart_impl(gzFile in) {
 
 DirResult DiskUsage::tree_walk(const string &reldir,const string &path,
                                int walk_index,shared_ptr<TopResult> tr,bool restart) {
+  assert(reldir.find('/') == string::npos);
   if(restart)
     info("restart state[%d] = %s\n",walk_index,path.c_str());
   assert(path.size());
@@ -856,6 +925,7 @@ DirResult DiskUsage::tree_walk(const string &reldir,const string &path,
     if((int64_t)state.size()>(walk_index+1)) {
       string sub_reldir(state[walk_index+1].get_reldir());
       string sub_path(state[walk_index+1].get_path());
+      printf("sub_reldir=%s sub_path=%s\n",sub_reldir.c_str(),sub_path.c_str());
       shared_ptr<TopResult> sub_tr=(walk_index==0) ? result_for(sub_reldir) : tr;
       DirResult result=tree_walk(sub_reldir,sub_path,walk_index+1,sub_tr,restart);
       state[walk_index].mark_done(sub_reldir);
@@ -866,6 +936,7 @@ DirResult DiskUsage::tree_walk(const string &reldir,const string &path,
         try {
           sub_tr->write_content(filename);
         } catch(const FileError &fe) {
+          assert(false);
           error("ERROR: %s: %s\n",filename.c_str(),fe.what());
           error("ERROR: Cannot write output files in run area. This is an unrecoverable error.\n");
           error("ERROR: Potential existential crisis: did the disk usage monitor run out of disk space?\n");
@@ -918,18 +989,9 @@ DirResult DiskUsage::tree_walk(const string &reldir,const string &path,
       shared_ptr<TopResult> sub_tr=(walk_index==0) ? result_for(dent->d_name) : tr;
       DirResult result=tree_walk(dent->d_name,substr,-1,sub_tr,false);
       state[walk_index]+=result;
-      if(walk_index==0) {
-        string filename=output_base+dent->d_name+".du.gz";
+      assert(state[walk_index].at_age(2).bytes >= result.at_age(2).bytes);
+      if(walk_index==0)
         *tr += result;
-        try {
-          sub_tr->write_content(filename);
-        } catch(const FileError &fe) {
-          error("ERROR: %s: %s\n",filename.c_str(),fe.what());
-          error("ERROR: Cannot write output files in run area. This is an unrecoverable error.\n");
-          error("ERROR: Potential existential crisis: did the disk usage monitor run out of disk space?\n");
-          exit(2);
-        }
-      }
     } else {
       struct stat sb;
       if(fstatat(dirfd(dir),dent->d_name,&sb,AT_SYMLINK_NOFOLLOW)) {
@@ -939,17 +1001,22 @@ DirResult DiskUsage::tree_walk(const string &reldir,const string &path,
         continue;
       }
 
-      state[walk_index].add(sb.st_size,sb.st_blocks,1);
-      tick_files++;
-
-      if(walk_index==0 && !skip) {
-        // Top level result entry for a file
-        shared_ptr<TopResult> result=result_for(dent->d_name);
-        result->add(sb.st_size,sb.st_blocks,1);
-        result->set_finish_time();
+      shared_ptr<TopResult> result;
+      time_t age = max<time_t>(0,time(NULL) - max(sb.st_mtime,sb.st_atime));
+      for(int iage=0; iage<DirResult::age_count; ++iage) {
+        if(age > DirResult::age_seconds[iage]) {
+          state[walk_index].add(iage, {sb.st_size,sb.st_blocks,1});
+          if(walk_index==0 && !skip) {
+            // Top level result entry for a file
+            if(!result)
+              result=result_for(dent->d_name);
+            result->add(iage, {sb.st_size,sb.st_blocks,1});
+            result->set_finish_time();
+          }
+          tr->add(iage, {sb.st_size,sb.st_blocks,1});
+        }
       }
-
-      tr->add(sb.st_size,sb.st_blocks,1);
+      tick_files++;
     }
 
     if(should_write_restart()) {
@@ -991,10 +1058,24 @@ DirResult DiskUsage::tree_walk(const string &reldir,const string &path,
     }
   } // directory loop
   closedir(dir);
-  DirResult result(state[walk_index]);
-  tr->add_content() << (long long)state[walk_index].bytes << '\t' << path << endl;;
-  debug("%lld\t%s\n",(long long)state[walk_index].bytes,path.c_str());
+  DirResult &result = state[walk_index];
+  for(auto & fr : result.get_result())
+    tr->add_content() << fr.bytes << '\t';
+  tr->add_content() << result.at_age(0).files << '\t' << path << endl;
+  debug("%lld\t%s\n",(long long)state[walk_index].at_age(0).bytes,path.c_str());
   state.pop_back();
+  if(walk_index==1) {
+    string filename=output_base+reldir+".du.gz";
+    try {
+      tr->write_content(filename);
+    } catch(const FileError &fe) {
+      assert(false);
+      error("ERROR: %s: %s\n",filename.c_str(),fe.what());
+      error("ERROR: Cannot write output files in run area. This is an unrecoverable error.\n");
+      error("ERROR: Potential existential crisis: did the disk usage monitor run out of disk space?\n");
+      exit(2);
+    }
+  }
   return result;
 } // tree_walk
 
@@ -1007,6 +1088,7 @@ void usage() {
         "  -f = if the done_file exists, delete it and run anyway.\n"
         "  -d done_file = write this file upon successful exit. Do not start if this file exists.\n"
         "  -o report_file = write the text report table to this file instead of stdout\n"
+        "  -s short_report_file = write out report only up to the date column to this file\n"
         "  -m rate = minimum files per second before triggering an exit (real value).\n"
         "  -r = restart from the /path/to/restart.gz file if possible, otherwise start over.\n"
         "  -q = be quiet; only prints errors and warnings.\n"
@@ -1020,11 +1102,11 @@ void usage() {
 }
 
 int main(int argc,char **argv) {
-  bool restart=false,force=false,scrub_restart=true;
-  string done_file,report_file;
+  bool restart=false,force=false;
+  string done_file,report_file,short_report;
 
   int opt;
-  while( (opt=getopt(argc,argv,"ilfrqvd:t:o:m:")) != -1 ) {
+  while( (opt=getopt(argc,argv,"s:ilfrqvd:t:o:m:")) != -1 ) {
     switch(opt) {
     case 'r':     restart=true;                         break;
     case 'f':     force=true;                           break;
@@ -1032,7 +1114,7 @@ int main(int argc,char **argv) {
     case 'v':     be_verbose();                         break;
     case 't':     set_restart_interval(atoi(optarg));   break;
     case 'd':     done_file=optarg;                     break;
-    case 's':     scrub_restart=false;                  break;
+    case 's':     short_report=optarg;                  break;
     case 'o':     report_file=optarg;                   break;
     case 'm':     g_min_files_per_second=atof(optarg);  break;
     case 'i':     g_ignore_failed_fstatat=true;         break;
@@ -1075,25 +1157,26 @@ int main(int argc,char **argv) {
   int64_t elapsed=above_int(du.time_elapsed(),1);
 
   int64_t curspace,softlimit;
-  if(!get_quota_info(input_path,curspace,softlimit))
+  int64_t curfiles,fsoftlimit;
+  if(!get_quota_info(input_path,curspace,softlimit,curfiles,fsoftlimit))
     return 1; // already printed error message
 
-  du.insert_unseen(curspace,"--unseen-by-du--");
+  du.insert_unseen(curspace,curfiles,"--unseen-by-du--");
 
-  if(!write_report(report_file,du,curspace,softlimit))
+  if(!write_report(report_file,du,curspace,softlimit,curfiles,fsoftlimit,false))
     return 1; // already printed error message
 
-  info("Processed %lld files in %lld seconds (%f per second)\n",
-          (long long)result.files,(long long)elapsed,
-          (double)result.files/(double)elapsed);
+  if(!short_report.empty() && !write_report(short_report,du,curspace,softlimit,curfiles,fsoftlimit,true))
+    return 1; // already printed error message
+
+  info("Processed %lld files in %lld seconds (%.2f per second)\n",
+       (long long)result.at_age(0).files,(long long)elapsed,
+       (double)result.at_age(0).files/(double)elapsed);
 
   if(done_file.size()) {
     ofstream f(done_file.c_str());
     f<<strstrftime("%a %d %b %Y %T %Z")<<endl;
   }
-
-  if(scrub_restart)
-    unlink(restart_path.c_str());
 
   return 0;
 }
