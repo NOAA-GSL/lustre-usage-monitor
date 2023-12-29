@@ -7,11 +7,11 @@
 
 export PATH=/apps/contrib/rocoto/1.3.3/bin/:$PATH
 
-set -e
+set -e 
 
-cd "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}"
+cd "$USAGE_MONITOR"
 
-echo -n "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}" > topdir.ent
+echo -n "$USAGE_MONITOR" > topdir.ent
 
 areas=( $( cat orion-disk-areas.lst ) )
 echo " " ${areas[@]} | sed 's, /, ,g ; s,/,--,g' > dir-entity-list.ent
