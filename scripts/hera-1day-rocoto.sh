@@ -2,8 +2,8 @@
 
 source /apps/lmod/lmod/init/bash
 
-module use /scratch1/BMC/wrfruc/Samuel.Trahan/soft/modulefiles/
-module load rocoto/squeue-last-job-workaround
+#module use /scratch1/BMC/wrfruc/Samuel.Trahan/soft/modulefiles/
+module load rocoto
 
 set -e
 
