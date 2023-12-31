@@ -31,7 +31,7 @@
     <walltime>00:15:00</walltime>
     <account>&ACCOUNT;</account>
     <cores>1</cores>
-    <command>set -x ; rm -rf <cyclestr offset="-16:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-14:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-12:00:00:00">&OUTDIR;/@Y@m@d</cyclestr></command>
+    <command>set -x ; rm -rf <cyclestr offset="-16:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-14:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-12:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-10:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-8:00:00:00">&OUTDIR;/@Y@m@d</cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/scrub.log</cyclestr></join>
     &TOPDIR_ENVAR;
     <dependency>
