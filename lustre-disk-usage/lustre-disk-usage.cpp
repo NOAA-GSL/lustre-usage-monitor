@@ -507,7 +507,7 @@ bool write_report(const string &where,const DiskUsage &du,int64_t curspace,int64
                    dot->at_age(1).bytes/1048576.0/1048576,
                    dot->at_age(2).bytes/1048576.0/1048576,
                    static_cast<long long int>(curfiles),
-                   max(0.0,double(curfiles)/max(1.0,double(fsoftlimit))*100),
+                   fsoftlimit ? max(0.0,double(curfiles)/max(1.0,double(fsoftlimit))*100) : 0.0,
                    static_cast<long long int>(fsoftlimit));
   if(result<=0) {
     error("%s: cannot write data: %s",tempfile.c_str(),strerror(errno));
@@ -536,7 +536,7 @@ bool write_report(const string &where,const DiskUsage &du,int64_t curspace,int64
               (*it)->at_age(1).bytes/1048576.0/1048576,
               (*it)->at_age(2).bytes/1048576.0/1048576,
               static_cast<long long int>((*it)->at_age(0).files),
-              max(0.0,double(curfiles)/max(1.0,double(fsoftlimit))*100));
+              fsoftlimit ? max(0.0,double(curfiles)/max(1.0,double(fsoftlimit))*100) : 0.0);
     if(result<=0) {
       error("%s: cannot write data: %s\n",tempfile.c_str(),strerror(errno));
       if(have_tempfile) unlink(tempfile.c_str());
