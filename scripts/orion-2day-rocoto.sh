@@ -7,7 +7,7 @@
 
 export PATH=/apps/contrib/rocoto/1.3.3/bin/:$PATH
 
-set -e 
+set -eu
 
 cd "$USAGE_MONITOR"
 
