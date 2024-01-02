@@ -47,7 +47,7 @@
       <account>&ACCOUNT;</account>
       <cores>1</cores>
       <native>--partition=orion</native>
-      <command><cyclestr>set -x ; ulimit -c 0 ; cd "&OUTDIR;/@Y@m@d" ; mkdir "#dir#" ; &DISK_USAGE_PROGRAM; -t "&RESTART_INTERVAL;" -d "#dir#.done" -r `echo /"#dir#" | sed s,--,/,g`  "#dir#.rst.gz" "#dir#/" -o "#dir#.txt"</cyclestr></command>
+      <command><cyclestr>set -x ; ulimit -c 0 ; cd "&OUTDIR;/@Y@m@d" ; mkdir "#dir#" ; &DISK_USAGE_PROGRAM; -i -t "&RESTART_INTERVAL;" -d "#dir#.done" -r `echo /"#dir#" | sed s,--,/,g`  "#dir#.rst.gz" "#dir#/" -s "#dir#-short.txt" -o "#dir#-full.txt"</cyclestr></command>
       <join><cyclestr>&OUTDIR;/@Y@m@d/log/#dir#.log</cyclestr></join>
       &TOPDIR_ENVAR;
       <dependency>
