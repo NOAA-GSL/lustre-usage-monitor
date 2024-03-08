@@ -2,10 +2,7 @@
 
 source /apps/lmod/lmod/init/bash
 
-export ROCOTO_SACCT_CACHE=$HOME/sacct-cache/sacct.txt
-
-module use /lfs4/BMC/wrfruc/Samuel.Trahan/soft/modulefiles/
-module load rocoto/1.3.2-sacct-cache
+module load rocoto
 
 set -e
 
