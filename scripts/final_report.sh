@@ -83,6 +83,8 @@ if [[ -d /lfs4 ]] ; then
 elif [[ -d /scratch1/NCEPDEV ]] ; then
     #scp "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}"/out/report.txt jetscp.rdhpcs.noaa.gov:/lfs1/BMC/rtfim/disk-usage/hera.txt
     system=hera
+elif ( hostname | grep -i herc > /dev/null ) then
+    system=hercules
 else
     system=orion
 fi
