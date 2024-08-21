@@ -2,7 +2,7 @@
 
 source /apps/lmod/lmod/init/bash
 
-module load rocoto
+module load rocoto/1.3.6
 
 set -e
 
