@@ -14,7 +14,7 @@
 <!ENTITY DIRS SYSTEM "./dir-entity-list.ent">
 <!ENTITY CYCLEDEF SYSTEM "./cycledef.ent">
 <!ENTITY SEARCH_DAYS "-4 -3 -2 -1 0 1 2 3 4">
-<!ENTITY ACCOUNT "hfv3gfs">
+<!ENTITY ACCOUNT "gsd-fv3-dev">
 <!ENTITY RESTART_HANG_TIME "2400">
 <!ENTITY RESTART_INTERVAL "120">
 <!ENTITY TOPDIR_ENVAR "<envar><name>USAGE_MONITOR</name><value>&TOPDIR;</value></envar>">
@@ -31,7 +31,7 @@
     <walltime>00:15:00</walltime>
     <account>&ACCOUNT;</account>
     <cores>1</cores>
-    <command>set -x ; rm -rf <cyclestr offset="-16:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-14:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-12:00:00:00">&OUTDIR;/@Y@m@d</cyclestr></command>
+    <command>set -x ; rm -rf <cyclestr offset="-16:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-14:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-12:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-10:00:00:00">&OUTDIR;/@Y@m@d</cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/scrub.log</cyclestr></join>
     &TOPDIR_ENVAR;
     <dependency>
