@@ -77,7 +77,7 @@ github_deliver() {
 }
 
 
-if [[ -d /lfs4 ]] ; then
+if [[ -d /lfs6 ]] ; then
     #/bin/cp -fpL "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}"/out/report.txt /lfs1/BMC/rtfim/disk-usage/jet.txt
     system=jet
 elif [[ -d /scratch1/NCEPDEV ]] ; then
@@ -86,7 +86,7 @@ elif [[ -d /scratch1/NCEPDEV ]] ; then
 elif ( hostname | grep -i herc > /dev/null ) then
     system=hercules
 else
-    system=orion
+    system=unknown
 fi
 
 github_deliver "$system" # exits script
