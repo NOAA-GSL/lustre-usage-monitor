@@ -8,10 +8,7 @@
 
 # source /apps/lmod/lmod/init/bash
 
-# module load contrib/0.1
-# module load rocoto/1.3.3
-
-export PATH=/apps/contrib/rocoto/1.3.6/bin/:$PATH
+module load contrib ruby rocoto
 
 set -e 
 
