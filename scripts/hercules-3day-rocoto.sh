@@ -19,7 +19,7 @@ echo -n "$USAGE_MONITOR" > topdir.ent
 areas=( $( cat hercules-disk-areas.lst ) )
 echo " " ${areas[@]} | sed 's, /, ,g ; s,/,--,g' > dir-entity-list.ent
 
-origin=$( date +%s -d "2024-05-24t00:00:00" )
+origin=$( date +%s -d "2026-05-26t00:00:00" )
 now=$( date +%s )
 delta=$(( (now-origin) % (3600*24*3) - 1 ))
 deltam2=$(( delta + 3600*24*3*3 ))
@@ -31,8 +31,4 @@ ymd00p1=$( date +%Y%m%d -d "$deltap1 seconds ago" )0000
 echo "$ymd00m2 $ymd00p1 72:00:00" > cycledef.ent
 
 which rocotorun > /dev/null
-if [[ -t 1 ]] ; then
-    rocotorun -w hercules-disk-usage.xml -d hercules-disk-usage.db --verbose 10
-else
-    rocotorun -w hercules-disk-usage.xml -d hercules-disk-usage.db
-fi
+rocotorun -w hercules-disk-usage.xml -d hercules-disk-usage.db "$@"

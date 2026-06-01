@@ -6,49 +6,61 @@
 
 # You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>. 
 
-set -xue
+set -x
 
 YMD="$1"
 report_to_xml="$2"
 agos="$3"
+make_lustre_report="$4"
+deliver_to_github=NO # FIXME: SHOULD BE YES
 # ago jet: $( seq -4 1 4 )
 # ago hera: $( seq 0 3 )
-shift 3
+shift 4
 
-mkdir reports || true
+echo_heading() {
+    echo "Project Directory             Sub-Directory           Dir Use (TB)  Dir Quota (%)   Dir Quota (TB)      Last Checked                    age>90d (TB)    age>180d (TB)     Files          File Quota (%)   File Quota"
+    echo
+    echo
+}
 
-tmpshort=reports/$YMD-short.txt-$$.tmp
-tmpfull=reports/$YMD-full.txt-$$.tmp
-echo "Project Directory             Sub-Directory           Dir Use (TB)  Dir Quota (%)   Dir Quota (TB)      Last Checked                    age>90d (TB)    age>180d (TB)     Files          File Quota (%)   File Quota" > "$tmpfull"
-echo >> "$tmpfull"
-echo "Project Directory             Sub-Directory           Dir Use (TB)  Dir Quota (%)   Dir Quota (TB)      Last Checked" > "$tmpshort"
-echo >> "$tmpfull"
-echo >> "$tmpshort"
-for area in "$@" ; do
-    for ago in $agos ; do
-        dir=$( date +%Y%m%d -d "$ago days ago" )
-        donefile="$dir/$area.done"
-        shortfile="$dir/$area-short.txt"
-        fullfile="$dir/$area-full.txt"
-        if [[ -e "$donefile" ]] ; then
-            cat "$fullfile" >> "$tmpfull"
-            echo >> "$tmpfull"
-            cat "$shortfile" >> "$tmpshort"
-            echo >> "$tmpshort"
-            break
+combine_xml_reports() {
+    tmpfull=reports/$YMD-full.txt-$$.tmp
+    tmppart=reports/$YMD-part.txt-$$.tmp
+    echo_heading > "$tmpfull"
+    for area in "$@" ; do
+        most_recent=NONE
+        found_one=NO
+        for ago in $agos ; do
+            dir=$( date +%Y%m%d -d "$ago days ago" )
+            donefile="$dir/$area.done"
+            fullfile="$dir/$area.xml"
+            if [[ -e "$donefile" ]] && ( "$make_lustre_report" "$fullfile" > "$tmppart" ) ; then
+                cat "$tmppart" >> "$tmpfull"
+                echo >> "$tmpfull"
+                found_one=YES
+                break
+            elif [[ "$most_recent" == NONE && -s "$fullfile" ]] ; then
+                most_recent="$fullfile"
+            fi
+        done
+        if [[ "$found_one" == NO ]] ; then
+            if [[ "$most_recent" != NONE ]] && ( "$make_lustre_report" "$most_recent" > "$tmppart" ) ; then
+                cat "$tmppart" >> "$tmpfull"
+                echo >> "$tmpfull"
+            else
+                echo "WARNING: Cannot find xml report for \"$area\"" 1>&2
+            fi
         fi
     done
-done
-tmpxml=reports/$YMD.xml-$$.tmp
-cat "$tmpfull" | "$report_to_xml" > "$tmpxml"
+    tmpxml=reports/$YMD.xml-$$.tmp
+    cat "$tmpfull" | "$report_to_xml" > "$tmpxml"
 
-mv "$tmpshort" reports/$YMD-short.txt
-mv "$tmpfull" reports/$YMD-full.txt
-mv "$tmpxml" reports/$YMD.xml
-ln -sf reports/$YMD-short.txt report-short.txt
-ln -sf reports/$YMD-short.txt report.txt
-ln -sf reports/$YMD-full.txt report-full.txt
-ln -sf reports/$YMD.xml report.xml
+    rm -f "$tmppart"
+
+    mv "$tmpfull" reports/$YMD-full.txt
+    ln -sf reports/$YMD-full.txt report.txt
+    ln -sf reports/$YMD-full.txt report-full.txt
+}
 
 update_github_txt() {
     set -uxe
@@ -74,6 +86,7 @@ update_github_txt() {
 github_deliver() {
     local dirname=report.$$.$RANDOM.$RANDOM
     local system="$1"
+    set -e
     git clone --branch master ssh://git@github.com/NOAA-GSL/usage-reports "$dirname"
     set +e
     ( update_github_txt "$dirname" "$system" )
@@ -82,17 +95,20 @@ github_deliver() {
     exit $success
 }
 
+find_system() {
+    if [[ -d /scratch1/NCEPDEV ]] ; then
+        system=hera
+    elif ( hostname | grep -i herc > /dev/null ) then
+        system=hercules
+    else
+        system=unknown
+    fi
+}
 
-if [[ -d /lfs6 ]] ; then
-    #/bin/cp -fpL "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}"/out/report.txt /lfs1/BMC/rtfim/disk-usage/jet.txt
-    system=jet
-elif [[ -d /scratch1/NCEPDEV ]] ; then
-    #scp "${USAGE_MONITOR:-$HOME/lustre-usage-monitor}"/out/report.txt jetscp.rdhpcs.noaa.gov:/lfs1/BMC/rtfim/disk-usage/hera.txt
-    system=hera
-elif ( hostname | grep -i herc > /dev/null ) then
-    system=hercules
-else
-    system=unknown
+mkdir reports || true
+combine_xml_reports "$@"
+
+if [[ "$deliver_to_github" == YES ]] ; then
+    find_system
+    github_deliver "$system" # exits script
 fi
-
-github_deliver "$system" # exits script

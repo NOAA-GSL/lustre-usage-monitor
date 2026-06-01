@@ -1,3 +1,5 @@
+/work2/noaa/co2
+/work2/noaa/wrfruc
 /work/noaa/amb-verif
 /work/noaa/ap-fc
 /work/noaa/chem-var
@@ -20,9 +22,8 @@
 /work/noaa/zrtrr
 /work/noaa/lpdm
 /work2/noaa/amb-verif
-/work2/noaa/ap-fc/
+/work2/noaa/ap-fc
 /work2/noaa/chem-var
-/work2/noaa/co2
 /work2/noaa/comgsi
 /work2/noaa/dtc-hwrf
 /work2/noaa/gmtb
@@ -37,6 +38,5 @@
 /work2/noaa/rtruc
 /work2/noaa/ufs-phys
 /work2/noaa/wrf-chem
-/work2/noaa/wrfruc
 /work2/noaa/zrtrr
 /work2/noaa/lpdm

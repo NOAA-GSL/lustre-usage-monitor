@@ -81,11 +81,11 @@ string strrealpath(const string &s);
 string strstrftime(const char *format,const struct tm *tm=NULL);
 string strhostname();
 bool write_xml_report_entry(FILE *tgt,
-			    const char *tag,
-			    const char *indent,
-			    const char *name,
-			    const char *valid_time,
-			    shared_ptr<const TopResult> sub);
+                            const char *tag,
+                            const char *indent,
+                            const char *name,
+                            const char *valid_time,
+                            shared_ptr<const TopResult> sub);
 bool write_xml_report(const string &where,const DiskUsage &du);
 
 ////////////////////////////////////////////////////////////////////////
@@ -197,6 +197,10 @@ public:
   const string &top_dir() const { return topdir; }
   shared_ptr<const TopResult> result_for(const string &name) const;
 private:
+  float scan_files_and_list_subdirs(
+      const string &reldir,const string &path,
+      int walk_index,shared_ptr<TopResult> tr,bool restart,
+      vector<string> &subdirs);
   DirResult tree_walk(const string &reldir,const string &path,int walk_index,shared_ptr<TopResult>,bool restart);
   shared_ptr<TopResult> result_for(const string &name);
   void clear();
@@ -214,9 +218,6 @@ private:
   vector < shared_ptr<TopResult> > ordered_results;
   unordered_map < string,shared_ptr<TopResult> > hashed_results;
   bool have_read_restart;
-
-  int64_t tick_time,tick_files;
-  int64_t complaints,bad_ticks,failed_fstatat;
 
   static const int64_t magic_number=0x3031130330311303ll;
 };
@@ -268,13 +269,23 @@ private:
 
 static int g_verbose=0;
 static int64_t g_restart_interval=300;
-static double g_min_files_per_second=0.1;
-static time_t g_bad_node_sleep_time=120;
-static bool g_ignore_failed_fstatat=false;
+static double g_min_files_per_second=15;
+
+static string g_report_file = "";
+
+static int64_t g_slow_io_check_interval = 30;
 
 ////////////////////////////////////////////////////////////////////////
 
 // Functions
+
+string append_path(const string &parent, const string &child) {
+  string result = parent;
+  if(parent.back()!='/') 
+    result+='/';
+  result+=child;
+  return result;
+}
 
 string strdirname(const char *path) {
   size_t len=strlen(path)+1;
@@ -381,6 +392,12 @@ void set_restart_interval(int64_t interval) {
   g_restart_interval=above_int(interval,10);
 }
 
+void set_slow_io_check_interval(int64_t interval) {
+  if(interval<10)
+    warning("warning: minimum slow check interval is 10 seconds; setting to 10\n");
+  g_slow_io_check_interval = above_int(interval,10);
+}
+
 int debug(const char *format,...) {
   va_list ap;
   if(g_verbose<1)
@@ -464,13 +481,13 @@ string xml_cleaned(const string &dirty) {
 
       // Send all text before the bad character.
       if(there > pos)
-	clean << dirty.substr(pos, there - pos);
+        clean << dirty.substr(pos, there - pos);
 
       // Use an entity for the bad character.
       if(dirty[there] == '<')
-	clean << "&lt;";
+        clean << "&lt;";
       else if(dirty[there] == '&')
-	clean << "&amp;";
+        clean << "&amp;";
 
       // Move pointer to the next character to process.
       pos = there + 1;
@@ -481,50 +498,50 @@ string xml_cleaned(const string &dirty) {
 }
 
 bool write_xml_report_entry(FILE *tgt,
-			    const char *tag,
-			    const char *indent,
-			    const char *name,
-			    const char *valid_time,
-			    shared_ptr<const TopResult> sub) {
+                            const char *tag,
+                            const char *indent,
+                            const char *name,
+                            const char *valid_time,
+                            shared_ptr<const TopResult> sub) {
   int err;
   using llu_type = long long unsigned int;
   err = fprintf(tgt,
-		"%s<%s>\n"
-		"%s  <path>%s</path>\n"
-		"%s  <valid>%s</valid>\n"
-		"%s  <total>\n"
-		"%s    <bytes>%f</bytes>\n"
-		"%s    <blocks>%llu</blocks>\n"
-		"%s    <files>%f</files>\n"
-		"%s  </total>\n"
-		"%s  <files_older_than age_in_seconds=\"%f\">\n"
-		"%s    <bytes>%f</bytes>\n"
-		"%s    <blocks>%llu</blocks>\n"
-		"%s    <files>%f</files>\n"
-		"%s  </files_older_than>\n"
-		"%s  <files_older_than age_in_seconds=\"%f\">\n"
-		"%s    <bytes>%f</bytes>\n"
-		"%s    <blocks>%llu</blocks>\n"
-		"%s    <files>%f</files>\n"
-		"%s  </files_older_than>\n",
-		indent, tag,
-		indent, name,
-		indent, valid_time,
-		indent,
-		indent, double(sub->at_age(0).bytes),
-		indent, llu_type(sub->at_age(0).blocks),
-		indent, double(sub->at_age(0).files),
-		indent,
-		indent, double(sub->age_seconds[1]),
-		indent, double(sub->at_age(1).bytes),
-		indent, llu_type(sub->at_age(1).blocks),
-		indent, double(sub->at_age(1).files),
-		indent,
-		indent, double(sub->age_seconds[2]),
-		indent, double(sub->at_age(2).bytes),
-		indent, llu_type(sub->at_age(2).blocks),
-		indent, double(sub->at_age(2).files),
-		indent);
+                "%s<%s>\n"
+                "%s  <path>%s</path>\n"
+                "%s  <valid>%s</valid>\n"
+                "%s  <total>\n"
+                "%s    <bytes>%f</bytes>\n"
+                "%s    <blocks>%llu</blocks>\n"
+                "%s    <files>%f</files>\n"
+                "%s  </total>\n"
+                "%s  <files_older_than age_in_seconds=\"%f\">\n"
+                "%s    <bytes>%f</bytes>\n"
+                "%s    <blocks>%llu</blocks>\n"
+                "%s    <files>%f</files>\n"
+                "%s  </files_older_than>\n"
+                "%s  <files_older_than age_in_seconds=\"%f\">\n"
+                "%s    <bytes>%f</bytes>\n"
+                "%s    <blocks>%llu</blocks>\n"
+                "%s    <files>%f</files>\n"
+                "%s  </files_older_than>\n",
+                indent, tag,
+                indent, name,
+                indent, valid_time,
+                indent,
+                indent, double(sub->at_age(0).bytes),
+                indent, llu_type(sub->at_age(0).blocks),
+                indent, double(sub->at_age(0).files),
+                indent,
+                indent, double(sub->age_seconds[1]),
+                indent, double(sub->at_age(1).bytes),
+                indent, llu_type(sub->at_age(1).blocks),
+                indent, double(sub->at_age(1).files),
+                indent,
+                indent, double(sub->age_seconds[2]),
+                indent, double(sub->at_age(2).bytes),
+                indent, llu_type(sub->at_age(2).blocks),
+                indent, double(sub->at_age(2).files),
+                indent);
   return err > 0;
 }
 
@@ -548,6 +565,8 @@ bool write_xml_report(const string &where,const DiskUsage &du) {
       return false;
     }
   }
+
+  fprintf(tgt, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\n");
 
   fprintf(tgt, "<usage>\n");
 
@@ -764,8 +783,7 @@ void DirWalkState::write_restart(gzFile out) const {
 
 DiskUsage::DiskUsage(const string &path,const string &restart_path,const string &output_base,bool restart):
   topdir(path), restart_path(restart_path), output_base(output_base),
-  have_read_restart(false),
-  tick_time(0),tick_files(0),complaints(0),bad_ticks(0),failed_fstatat(0)
+  have_read_restart(false)
 {
   start_time=time(NULL);
   last_restart_write=start_time;
@@ -846,7 +864,7 @@ bool DiskUsage::write_restart() const {
   }
   
   last_restart_write=time(NULL);
-  info("%s: wrote RESTART at %s\n",restart_path.c_str(),strstrftime("%a %d %b %Y %T %Z").c_str());
+  info("%s: (**) wrote RESTART at %s\n",restart_path.c_str(),strstrftime("%a %d %b %Y %T %Z").c_str());
   
   return true;
 }
@@ -932,59 +950,24 @@ void DiskUsage::read_restart_impl(gzFile in) {
 
 // class DiskUsage: tree_walk (the meat of the program)
 
-DirResult DiskUsage::tree_walk(const string &reldir,const string &path,
-                               int walk_index,shared_ptr<TopResult> tr,bool restart) {
-  assert(reldir.find('/') == string::npos);
-  if(restart)
-    info("restart state[%d] = %s\n",walk_index,path.c_str());
-  assert(path.size());
-  if(!restart) {
-    walk_index=state.size();
-    state.emplace_back(reldir,path);
-    state.back().clear_done();
-  }
-  if(walk_index==0) {
-    tick_time=time(NULL);
-    tick_files=0;
-  }
-  assert(walk_index>=0);
-  if(restart) {
-    if((int64_t)state.size()>(walk_index+1)) {
-      string sub_reldir(state[walk_index+1].get_reldir());
-      string sub_path(state[walk_index+1].get_path());
-      printf("sub_reldir=%s sub_path=%s\n",sub_reldir.c_str(),sub_path.c_str());
-      shared_ptr<TopResult> sub_tr=(walk_index==0) ? result_for(sub_reldir) : tr;
-      DirResult result=tree_walk(sub_reldir,sub_path,walk_index+1,sub_tr,restart);
-      state[walk_index].mark_done(sub_reldir);
-      state[walk_index]+=result;
-      if(walk_index==0) {
-        string filename = output_base+sub_reldir+".du.gz";
-        *tr += result;
-        try {
-          sub_tr->write_content(filename);
-        } catch(const FileError &fe) {
-          assert(false);
-          error("ERROR: %s: %s\n",filename.c_str(),fe.what());
-          error("ERROR: Cannot write output files in run area. This is an unrecoverable error.\n");
-          error("ERROR: Potential existential crisis: did the disk usage monitor run out of disk space?\n");
-          exit(2);
-        }
-      }
-    } else
-      write_restart();
-  }
+float DiskUsage::scan_files_and_list_subdirs(
+      const string &reldir,const string &path,
+      int walk_index,shared_ptr<TopResult> tr,bool restart,
+      vector<string> &subdirs) {
+
+  struct dirent *dent;
+
+  time_t last_check = time(NULL);
+  size_t files_since_last_check = 0;
+  double files_per_second = 0;
 
   DIR *dir=opendir(path.c_str());
   if(!dir) {
     warning("warning: %s: cannot open dir; will ignore\n",path.c_str());
     state.pop_back();
-    return DirResult();
+    return -1;
   }
 
-  if(!restart && walk_index==0)
-    write_restart();
-
-  struct dirent *dent;
   while( (dent=readdir(dir)) ) {
     bool skip=false;
     if(restart && state[walk_index].is_done(dent->d_name))
@@ -1002,29 +985,18 @@ DirResult DiskUsage::tree_walk(const string &reldir,const string &path,
       continue; // Don't handle hard links twice
     }
 
-    state[walk_index].mark_done(dent->d_name);
-    ino_seen.insert(dent->d_ino);
+    files_since_last_check++;
 
     if(dent->d_type == DT_DIR && !skip) {
-      string substr=path;
-      if(path.back()=='/') 
-        substr+=dent->d_name;
-      else {
-        substr+='/';
-        substr+=dent->d_name;
-      }
-      shared_ptr<TopResult> sub_tr=(walk_index==0) ? result_for(dent->d_name) : tr;
-      DirResult result=tree_walk(dent->d_name,substr,-1,sub_tr,false);
-      state[walk_index]+=result;
-      assert(state[walk_index].at_age(2).bytes >= result.at_age(2).bytes);
-      if(walk_index==0)
-        *tr += result;
+      subdirs.push_back(dent->d_name);
     } else {
+      state[walk_index].mark_done(dent->d_name);
+      ino_seen.insert(dent->d_ino);
+
       struct stat sb;
       if(fstatat(dirfd(dir),dent->d_name,&sb,AT_SYMLINK_NOFOLLOW)) {
-        warning("warning: %s/%s: cannot fstatat; will ignore: %s\n",path.c_str(),dent->d_name,strerror(errno));
-        if(!g_ignore_failed_fstatat)
-          failed_fstatat++;
+        warning("warning: %s/%s: cannot fstatat; will ignore: %s/%s\n",
+                reldir.c_str(), path.c_str(), dent->d_name, strerror(errno));
         continue;
       }
 
@@ -1043,60 +1015,146 @@ DirResult DiskUsage::tree_walk(const string &reldir,const string &path,
           tr->add(iage, {sb.st_size,sb.st_blocks,1});
         }
       }
-      tick_files++;
+    }
+
+    time_t now = time(NULL);
+    if(now - last_check > g_slow_io_check_interval) {
+      files_per_second = files_since_last_check / double(now - last_check);
+      info("%s: Check speed. Am here at %f / %f = %f files per second (min allowed %f in %f seconds)\n",
+             path.c_str(), double(files_since_last_check), double(now - last_check), files_per_second, g_min_files_per_second, double(g_slow_io_check_interval));
+      if(files_per_second < g_min_files_per_second) {
+        string host = strhostname();
+        warning("warning: %s: Slow scan (%f files per second) at path %s\n",
+                host.c_str(), files_per_second, path.c_str());
+        warning("warning: %s: Aborting scan of files; proceeding to subdirectories of %s\n", host.c_str(), path.c_str());
+        break;
+      }
+      last_check = now;
+      files_since_last_check = 0;
     }
 
     if(should_write_restart()) {
-      time_t now=time(NULL);
+      if(files_per_second > 0)
+        info("%s: am here (1) at %f files per second (min allowed %f)\n",
+               path.c_str(), files_per_second, g_min_files_per_second);
       write_restart();
-      double rate=tick_files/double(now-tick_time);
-      info("%s: am here at %f files/sec\n",path.c_str(),rate);
-      int64_t unhappiness = bad_ticks*20 + failed_fstatat;
-      string host=strhostname();
-      if(unhappiness>=20 && complaints<1) {
-        complaints++;
-        warning("warning: %s: possible bad node\n",host.c_str());
-        if(failed_fstatat>0)
-          warning("warning: %s: %lld fstatat calls have failed\n",
-                  host.c_str(),(long long)failed_fstatat);
-        if(rate<g_min_files_per_second)
-          warning("warning: %s: %f files/s is below minimum allowed %f\n",
-                  host.c_str(),rate,g_min_files_per_second);
-        if(g_bad_node_sleep_time>0) {
-          warning("warning: will sleep %lld seconds and hope the node fixes itself...\n",
-                  g_bad_node_sleep_time);
-          sleep(g_bad_node_sleep_time);
-          warning("... done sleeping.\n");
-        }
-      } else if(unhappiness>=40) {
-        complaints++;
-        error("ERROR: %s: likely a bad node. Will abort.\n",host.c_str());
-        if(failed_fstatat>0)
-          error("ERROR: %s: %lld fstatat calls have failed\n",
-                host.c_str(),(long long)failed_fstatat);
-        if(rate<g_min_files_per_second)
-          error("ERROR: %s: %f files/s is below minimum allowed %f\n",
-                host.c_str(),rate,g_min_files_per_second);
-        error("ERROR: will exit with status 3 now.\n");
-        exit(3);
-      }
-      tick_time=now;
-      tick_files=0;
+      write_xml_report(g_report_file, *this);
     }
   } // directory loop
   closedir(dir);
+
+  time_t now = time(NULL);
+  if(now > last_check) {
+    files_per_second = files_since_last_check / double(now - last_check);
+    info("%s: Finished files only, now %f / %f = %f files per second\n",
+         path.c_str(), double(files_since_last_check), double(now - last_check), files_per_second);
+  }
+
+  if(!restart && walk_index==0 && should_write_restart()) {
+    if(files_per_second >= 0)
+      info("%s: am here (2) at %f files per second (min allowed %f)\n",
+             path.c_str(), files_per_second, g_min_files_per_second);
+    write_restart();
+    write_xml_report(g_report_file, *this);
+  }
+
+  return true;
+}
+
+////////////////////////////////////////////////////////////////////////
+
+DirResult DiskUsage::tree_walk(const string &reldir,const string &path,
+                               int walk_index,shared_ptr<TopResult> tr,bool restart) {
+  assert(reldir.find('/') == string::npos);
+  if(restart)
+    info("restart state[%d] = %s\n",walk_index,path.c_str());
+  assert(path.size());
+
+  if(!restart) {
+    walk_index=state.size();
+    state.emplace_back(reldir,path);
+    state.back().clear_done();
+  }
+  assert(walk_index>=0);
+
+  if(restart) {
+    if((int64_t)state.size()>(walk_index+1)) {
+      string sub_reldir(state[walk_index+1].get_reldir());
+      string sub_path(state[walk_index+1].get_path());
+      printf("sub_reldir=%s sub_path=%s\n",sub_reldir.c_str(),sub_path.c_str());
+      shared_ptr<TopResult> sub_tr=(walk_index==0) ? result_for(sub_reldir) : tr;
+      DirResult result=tree_walk(sub_reldir,sub_path,walk_index+1,sub_tr,restart);
+      state[walk_index].mark_done(sub_reldir);
+      state[walk_index]+=result;
+      if(walk_index==0) {
+        string filename = output_base+sub_reldir+".du.gz";
+        *tr += result;
+        try {
+          sub_tr->write_content(filename);
+        } catch(const FileError &fe) {
+          error("ERROR: %s: %s\n",filename.c_str(),fe.what());
+          error("ERROR: Cannot write output files in run area. This is an unrecoverable error.\n");
+          error("ERROR: Potential existential crisis: did the disk usage monitor run out of disk space?\n");
+          exit(2);
+        }
+      }
+    } else {
+      write_restart();
+      write_xml_report(g_report_file, *this);
+    }
+  }
+
+  vector<string> subdirs;
+  float scan_rate = scan_files_and_list_subdirs(
+      reldir, path,
+      walk_index, tr, restart, subdirs);
+  if(scan_rate < 0) {
+    // Was unable to scan directory. Error already printed.
+    // Can't do anything more in this directory, so return an empty scan.
+    return DirResult();
+  }
+
+  for(auto &subname : subdirs) {
+    if(restart && state[walk_index].is_done(subname))
+      continue; // Already processed this before restart
+
+    state[walk_index].mark_done(subname);
+
+    string substr = append_path(path, subname);
+    shared_ptr<TopResult> sub_tr=(walk_index==0) ? result_for(subname) : tr;
+    DirResult result=tree_walk(subname, substr, -1, sub_tr, false);
+
+    state[walk_index]+=result;
+    assert(state[walk_index].at_age(2).bytes >= result.at_age(2).bytes);
+
+    if(walk_index==0)
+      *tr += result;
+
+    if(should_write_restart()) {
+      if(scan_rate > 0)
+        info("%s: am here (3) at %f files per second (min allowed %f)\n",
+               path.c_str(), scan_rate, g_min_files_per_second);
+      write_restart();
+      write_xml_report(g_report_file, *this);
+    }
+  } // subdirectory loop
+
   DirResult &result = state[walk_index];
+
+  // Update the content for the top-level directory containing this descendant.
   for(auto & fr : result.get_result())
     tr->add_content() << fr.bytes << '\t';
   tr->add_content() << result.at_age(0).files << '\t' << path << endl;
   debug("%lld\t%s\n",(long long)state[walk_index].at_age(0).bytes,path.c_str());
+
   state.pop_back();
+
   if(walk_index==1) {
+    // Done scanning the top-level directory. Write the directory's report.
     string filename=output_base+reldir+".du.gz";
     try {
       tr->write_content(filename);
     } catch(const FileError &fe) {
-      assert(false);
       error("ERROR: %s: %s\n",filename.c_str(),fe.what());
       error("ERROR: Cannot write output files in run area. This is an unrecoverable error.\n");
       error("ERROR: Potential existential crisis: did the disk usage monitor run out of disk space?\n");
@@ -1115,12 +1173,11 @@ void usage() {
         "  -f = if the done_file exists, delete it and run anyway.\n"
         "  -d done_file = write this file upon successful exit. Do not start if this file exists.\n"
         "  -o report_file = write the text report table to this file instead of stdout\n"
-        "  -m rate = minimum files per second before triggering an exit (real value).\n"
+        "  -m rate = minimum files per second before skipping a directory's files (real value).\n"
         "  -r = restart from the /path/to/restart.gz file if possible, otherwise start over.\n"
         "  -q = be quiet; only prints errors and warnings.\n"
         "  -v = be extremely verbose; only useful for debugging.\n"
         "  -t restart_interval = write restart files this often (seconds; minimum 10)\n"
-        "  -i = do not abort due to large numbers of failed fstatat calls (needed on Hera scratch1)\n"
         "\n"
         "/path/to/dir = the directory whose usage you want\n"
         "/path/to/restart.gz = name of the gzipped restart file\n"
@@ -1129,20 +1186,20 @@ void usage() {
 
 int main(int argc,char **argv) {
   bool restart=false,force=false;
-  string done_file,report_file;
+  string done_file;
 
   int opt;
-  while( (opt=getopt(argc,argv,"fd:o:m:rqvt:i")) != -1 ) {
+  while( (opt=getopt(argc,argv,"fd:o:m:rqvt:")) != -1 ) {
     switch(opt) {
     case 'f':     force=true;                           break;
     case 'd':     done_file=optarg;                     break;
-    case 'o':     report_file=optarg;                   break;
+    case 'o':     g_report_file=optarg;                 break;
     case 'm':     g_min_files_per_second=atof(optarg);  break;
     case 'r':     restart=true;                         break;
     case 'q':     be_quiet();                           break;
     case 'v':     be_verbose();                         break;
     case 't':     set_restart_interval(atoi(optarg));   break;
-    case 'i':     g_ignore_failed_fstatat=true;         break;
+    case 's': set_slow_io_check_interval(atof(optarg)); break;
     default:
       usage();
       return 2;
@@ -1181,7 +1238,7 @@ int main(int argc,char **argv) {
   DirResult result=du.tree_walk();
   int64_t elapsed=above_int(du.time_elapsed(),1);
 
-  if(!write_xml_report(report_file,du))
+  if(!write_xml_report(g_report_file, du))
     return 1; // already printed error message
 
   info("Processed %lld files in %lld seconds (%.2f per second)\n",
