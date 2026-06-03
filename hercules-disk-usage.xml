@@ -16,7 +16,7 @@
 <!ENTITY XML_SCRIPT "&TOPDIR;/scripts/report_to_xml.pl">
 <!ENTITY REPORT "&OUTDIR;/report.txt">
 <!ENTITY DISK_AREAS "&TOPDIR;/disk-areas.lst">
-<!ENTITY DEADLINE "03:00:15:00">
+<!ENTITY DEADLINE "04:00:15:00">
 <!ENTITY SCRUB_OFFSET "00:08:30:00">
 <!ENTITY SCAN_OFFSET "00:00:15:00">
 <!ENTITY DIRS SYSTEM "./dir-entity-list.ent">
@@ -28,7 +28,7 @@
 <!ENTITY TOPDIR_ENVAR "<envar><name>USAGE_MONITOR</name><value>&TOPDIR;</value></envar>">
 ]>
 
-<workflow realtime="T" scheduler="slurm" taskthrottle="5" cyclethrottle="3" cyclelifespan="03:08:00:00">
+<workflow realtime="T" scheduler="slurm" taskthrottle="5" cyclethrottle="3" cyclelifespan="04:08:00:00">
   <log>
     <cyclestr>&OUTDIR;/@Y@m@d/log/workflow.log</cyclestr>
   </log>
@@ -39,7 +39,7 @@
     <walltime>00:15:00</walltime>
     <account>&ACCOUNT;</account>
     <cores>1</cores>
-    <command>set -x ; rm -rf <cyclestr offset="-15:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-12:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-9:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-6:00:00:00">&OUTDIR;/@Y@m@d</cyclestr></command>
+    <command>set -x ; rm -rf <cyclestr offset="-20:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-16:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-12:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-8:00:00:00">&OUTDIR;/@Y@m@d</cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/scrub.log</cyclestr></join>
     &TOPDIR_ENVAR;
     <dependency>
@@ -49,7 +49,7 @@
 
   <metatask name="du">
     <var name="dir">&DIRS;</var>
-    <task name="#dir#" maxtries="26">
+    <task name="#dir#" maxtries="40">
       <queue>batch</queue>
       <walltime>03:00:00</walltime>
       <account>&ACCOUNT;</account>
