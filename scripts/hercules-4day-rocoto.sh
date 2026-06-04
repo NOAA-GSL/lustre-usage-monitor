@@ -19,12 +19,12 @@ echo -n "$USAGE_MONITOR" > topdir.ent
 areas=( $( cat hercules-disk-areas.lst ) )
 echo " " ${areas[@]} | sed 's, /, ,g ; s,/,--,g' > dir-entity-list.ent
 
-origin=$( date +%s -d "2026-06-04t00:00:00" )
+origin=$( date +%s -d "2026-06-01t00:00:00" )
 now=$( date +%s )
 delta=$(( (now-origin) % (3600*24*4) - 1 ))
 
-earlier_seconds=$(( delta - 3600*24*3*3 ))
-later_seconds=$(( delta + 3600*24*3*4 ))
+earlier_seconds=$(( delta + 3600*24*3*4 ))
+later_seconds=$(( delta - 3600*24*3*3 ))
 
 earlier_minute=$( date +%Y%m%d -d "$earlier_seconds seconds ago" )0000
 later_minute=$( date +%Y%m%d -d "$later_seconds seconds ago" )0000

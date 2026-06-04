@@ -968,11 +968,14 @@ float DiskUsage::scan_files_and_list_subdirs(
     return -1;
   }
 
+  bool too_slow = false;
+
   while( (dent=readdir(dir)) ) {
-    bool skip=false;
+    bool skip = false;
     if(restart && state[walk_index].is_done(dent->d_name))
       continue; // Already processed this before restart
 
+    // Skip . and ..
     if(dent->d_name[0]=='.') {
       if(dent->d_name[1]=='.' && dent->d_name[2]=='\0')
         continue;
@@ -985,11 +988,11 @@ float DiskUsage::scan_files_and_list_subdirs(
       continue; // Don't handle hard links twice
     }
 
-    files_since_last_check++;
-
     if(dent->d_type == DT_DIR && !skip) {
+      files_since_last_check++;
       subdirs.push_back(dent->d_name);
-    } else {
+    } else if(!too_slow) {
+      files_since_last_check++;
       state[walk_index].mark_done(dent->d_name);
       ino_seen.insert(dent->d_ino);
 
@@ -1027,7 +1030,8 @@ float DiskUsage::scan_files_and_list_subdirs(
         warning("warning: %s: Slow scan (%f files per second) at path %s\n",
                 host.c_str(), files_per_second, path.c_str());
         warning("warning: %s: Aborting scan of files; proceeding to subdirectories of %s\n", host.c_str(), path.c_str());
-        break;
+        too_slow = true;
+        continue;
       }
       last_check = now;
       files_since_last_check = 0;
@@ -1043,22 +1047,24 @@ float DiskUsage::scan_files_and_list_subdirs(
   } // directory loop
   closedir(dir);
 
-  time_t now = time(NULL);
-  if(now > last_check) {
-    files_per_second = files_since_last_check / double(now - last_check);
-    info("%s: Finished files only, now %f / %f = %f files per second\n",
-         path.c_str(), double(files_since_last_check), double(now - last_check), files_per_second);
+  if(!too_slow) {
+    time_t now = time(NULL);
+    if(now > last_check) {
+      files_per_second = files_since_last_check / double(now - last_check);
+      info("%s: Finished files only, now %f / %f = %f files per second\n",
+           path.c_str(), double(files_since_last_check), double(now - last_check), files_per_second);
+    }
   }
 
   if(!restart && walk_index==0 && should_write_restart()) {
-    if(files_per_second >= 0)
+    if(!too_slow && files_per_second >= 0)
       info("%s: am here (2) at %f files per second (min allowed %f)\n",
              path.c_str(), files_per_second, g_min_files_per_second);
     write_restart();
     write_xml_report(g_report_file, *this);
   }
 
-  return true;
+  return files_per_second;
 }
 
 ////////////////////////////////////////////////////////////////////////

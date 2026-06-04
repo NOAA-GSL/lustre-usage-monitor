@@ -13,30 +13,48 @@ report_to_xml="$2"
 agos="$3"
 make_lustre_report="$4"
 deliver_to_github=NO # FIXME: SHOULD BE YES
-# ago jet: $( seq -4 1 4 )
-# ago hera: $( seq 0 3 )
 shift 4
 
 echo_heading() {
-    echo "Project Directory             Sub-Directory           Dir Use (TB)  Dir Quota (%)   Dir Quota (TB)      Last Checked                    age>90d (TB)    age>180d (TB)     Files          File Quota (%)   File Quota"
+    local mode=$1
+    if [[ $mode == long ]] ; then
+        echo "Project Directory             Sub-Directory           Dir Use (TB)  Dir Quota (%)   Dir Quota (TB)      Last Checked                    age>90d (TB)    age>180d (TB)     Files          File Quota (%)   File Quota"
+    else
+        echo "Project Directory             Sub-Directory           Dir Use (TB)  Dir Quota (%)   Dir Quota (TB)      Last Checked"
+    fi
     echo
     echo
 }
 
 combine_xml_reports() {
-    tmpfull=reports/$YMD-full.txt-$$.tmp
-    tmppart=reports/$YMD-part.txt-$$.tmp
-    echo_heading > "$tmpfull"
+    local mode="$1"
+    shift 1
+
+    local tmpdone=reports/$YMD-$mode.txt-$$.tmp
+    local tmppart=reports/$YMD-$mode-part.txt-$$.tmp
+    local area
+    local target
+    local tmpxml
+
+    if [[ $mode == long ]] ; then
+        target=reports/$YMD-full.txt
+    else
+        target=reports/$YMD.txt
+    fi
+
+    posix_ymd="${YMD:0:4}-${YMD:4:2}-${YMD:6:2}t12:00:00 UTC+0"
+
+    echo_heading "$mode" > "$tmpdone"
     for area in "$@" ; do
-        most_recent=NONE
-        found_one=NO
+        local most_recent=NONE
+        local found_one=NO
         for ago in $agos ; do
-            dir=$( date +%Y%m%d -d "$ago days ago" )
-            donefile="$dir/$area.done"
-            fullfile="$dir/$area.xml"
-            if [[ -e "$donefile" ]] && ( "$make_lustre_report" "$fullfile" > "$tmppart" ) ; then
-                cat "$tmppart" >> "$tmpfull"
-                echo >> "$tmpfull"
+            local dir=$( date +%Y%m%d -d "$posix_ymd -$ago days" )
+            local donefile="$dir/$area.done"
+            local fullfile="$dir/$area.xml"
+            if [[ -e "$donefile" ]] && ( "$make_lustre_report" "$mode" "$fullfile" > "$tmppart" ) ; then
+                cat "$tmppart" >> "$tmpdone"
+                echo >> "$tmpdone"
                 found_one=YES
                 break
             elif [[ "$most_recent" == NONE && -s "$fullfile" ]] ; then
@@ -44,22 +62,27 @@ combine_xml_reports() {
             fi
         done
         if [[ "$found_one" == NO ]] ; then
-            if [[ "$most_recent" != NONE ]] && ( "$make_lustre_report" "$most_recent" > "$tmppart" ) ; then
-                cat "$tmppart" >> "$tmpfull"
-                echo >> "$tmpfull"
+            if [[ "$most_recent" != NONE ]] && ( "$make_lustre_report" "$mode" "$most_recent" > "$tmppart" ) ; then
+                cat "$tmppart" >> "$tmpdone"
+                echo >> "$tmpdone"
             else
                 echo "WARNING: Cannot find xml report for \"$area\"" 1>&2
             fi
         fi
     done
-    tmpxml=reports/$YMD.xml-$$.tmp
-    cat "$tmpfull" | "$report_to_xml" > "$tmpxml"
+    if [[ "$mode" == long ]] ; then
+        tmpxml=reports/$YMD.xml-$$.tmp
+        cat "$tmpdone" | "$report_to_xml" > "$tmpxml"
+    fi
 
     rm -f "$tmppart"
+    mv "$tmpdone" "$target"
 
-    mv "$tmpfull" reports/$YMD-full.txt
-    ln -sf reports/$YMD-full.txt report.txt
-    ln -sf reports/$YMD-full.txt report-full.txt
+    if [[ $mode == long ]] ; then
+        ln -sf "$target" report-full.txt
+    else
+        ln -sf "$target" report.txt
+    fi
 }
 
 update_github_txt() {
@@ -106,7 +129,8 @@ find_system() {
 }
 
 mkdir reports || true
-combine_xml_reports "$@"
+combine_xml_reports long "$@"
+combine_xml_reports short "$@"
 
 if [[ "$deliver_to_github" == YES ]] ; then
     find_system

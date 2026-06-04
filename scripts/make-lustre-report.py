@@ -38,29 +38,36 @@ def get_lustre_usage(path, indent):
     }
         
 
-def handle_usage(usage):
+def handle_usage(long_format, usage):
     for dir in usage.getElementsByTagName('dir'):
-        handle_dir(dir)
+        handle_dir(long_format, dir)
 
-def handle_dir(dir):
+def handle_dir(long_format, dir):
     path, lustre_usage, total_bytes, total_blocks, total_files, valid_time = \
-        handle_subdir(dir, '  ', None, True)
+        handle_subdir(long_format, dir, '  ', None, True)
     remaining_bytes = total_bytes
     remaining_blocks = total_blocks
     remaining_files = total_files
     for subdir in dir.getElementsByTagName('subdir'):
         _, _, bytes, blocks, files, _ = \
-            handle_subdir(subdir, '    ', lustre_usage, False)
+            handle_subdir(long_format, subdir, '    ', lustre_usage, False)
         remaining_bytes -= bytes
         remaining_blocks -= blocks
         remaining_files -= files
 
+    remaining_bytes = max(0, remaining_bytes)
+    remaining_blocks = max(0, remaining_blocks)
+    remaining_files = max(0, remaining_files)
+
     remaining = { 'bytes': remaining_bytes, 'blocks': remaining_blocks, 'files': remaining_files }
     zero = { 'bytes': 0, 'blocks': 0, 'files': 0 }
 
-    print_usage(valid_time, '--unseen-by-scan--', remaining, zero, zero, lustre_usage, False)
+    if long_format:
+        print_long_usage(valid_time, '--unseen-by-scan--', remaining, zero, zero, lustre_usage, False)
+    else:
+        print_short_usage(valid_time, '--unseen-by-scan--', remaining, zero, zero, lustre_usage, False)
 
-def print_usage(timestamp, path, total, old1, old2, lustre_usage, show_quota):
+def print_long_usage(timestamp, path, total, old1, old2, lustre_usage, show_quota):
     # result=fprintf(tgt,"%-44s\t\t%5.1f\t\t%5.1f%%\t\t%5.1f\t\t%s\t%8.1f\t%8.1f\t%10lld\t%8.1f%%\t%lld\n",
     #                strrealpath(du.top_dir()).c_str(),
     #                double(curspace)/1048576.0/1048576,max(0.0,double(curspace)/softlimit*100),
@@ -99,7 +106,37 @@ def print_usage(timestamp, path, total, old1, old2, lustre_usage, show_quota):
 
     print(printme)
 
-def handle_subdir(dir, indent, lustre_usage, show_quota):
+def print_short_usage(timestamp, path, total, old1, old2, lustre_usage, show_quota):
+    # result=fprintf(tgt,"%-44s\t\t%5.1f\t\t%5.1f%%\t\t%5.1f\t\t%s\n",
+    #                strrealpath(du.top_dir()).c_str(),
+    #                double(curspace)/1048576.0/1048576,max(0.0,double(curspace)/softlimit*100),
+    #                double(softlimit)/1048576.0/1048576,strstrftime("%a %d %b %Y %T %Z").c_str());
+
+    softlimit = lustre_usage["bytes_soft_quota"] / 1048576.0 / 1024.0
+    curspace = total['bytes'] / 1048576.0 / 1048576.0
+    curspace_pct = max(0.0, curspace / softlimit) * 100
+    time_string = timestamp.strftime("%a %d %b %Y %T GMT")
+
+    curfiles = int(total['files'])
+    filelimit = lustre_usage["files_soft_quota"]
+    file_pct = 0.0
+    if filelimit > 0:
+        file_pct = max(0.0, float(curfiles) / max(1.0, float(filelimit)) * 100)
+
+    printme = f'{path:44s}\t\t'
+    printme += f'{curspace:5.1f}\t\t'
+    printme += f'{curspace_pct:5.1f}%\t\t'
+    if show_quota:
+        printme += f'{softlimit:5.1f}'
+    printme += f'\t\t{time_string}\t'
+    printme += f'{curfiles:10d}\t'
+    printme += f'{file_pct:8.1f}%\t'
+    if show_quota:
+        printme += f'{filelimit:d}'
+
+    print(printme)
+
+def handle_subdir(long_format, dir, indent, lustre_usage, show_quota):
     path = get_element_text(dir, 'path')
     #print(f'{indent}{path}')
 
@@ -125,7 +162,10 @@ def handle_subdir(dir, indent, lustre_usage, show_quota):
     old1_hash = { 'bytes':old[0][0], 'blocks':old[0][1], 'files':old[0][2] }
     old2_hash = { 'bytes':old[1][0], 'blocks':old[1][1], 'files':old[1][2] }
 
-    print_usage(valid_time, path, total_hash, old1_hash, old2_hash, lustre_usage, show_quota)
+    if long_format:
+        print_long_usage(valid_time, path, total_hash, old1_hash, old2_hash, lustre_usage, show_quota)
+    else:
+        print_short_usage(valid_time, path, total_hash, old1_hash, old2_hash, lustre_usage, show_quota)
 
     return path, lustre_usage, total_bytes, total_blocks, total_files, valid_time
 
@@ -146,12 +186,19 @@ def handle_files_older_than(node, indent):
     #print(f'{indent}older than {age_in_seconds!r} seconds: bytes={bytes!r} blocks={blocks!r} files={files!r}')
     return bytes, blocks, files, age_in_seconds
 
-def handle_file(filename):
+def handle_file(long_format, filename):
     dom = xml.dom.minidom.parse(filename)
-    handle_usage(dom)
+    handle_usage(long_format, dom)
 
 def __main():
-    handle_file(sys.argv[1])
+    if sys.argv[1] == 'long':
+        handle_file(True, sys.argv[2])
+    elif sys.argv[1] == 'short':
+        handle_file(False, sys.argv[2])
+    else:
+        sys.stderr.write('Syntax: make-lustre-report.py [ long | short ] /path/to/input.xml\n')
+        sys.stderr.write(f'Unknown mode "{sys.argv[1]}"\n')
+        exit(1)
 
 if __name__ == '__main__':
     __main()

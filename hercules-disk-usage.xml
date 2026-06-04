@@ -21,7 +21,7 @@
 <!ENTITY SCAN_OFFSET "00:00:15:00">
 <!ENTITY DIRS SYSTEM "./dir-entity-list.ent">
 <!ENTITY CYCLEDEF SYSTEM "./cycledef.ent">
-<!ENTITY SEARCH_DAYS "-4 -3 -2 -1 0 1 2 3 4">
+<!ENTITY SEARCH_DAYS "0 4 8">
 <!ENTITY ACCOUNT "zrtrr">
 <!ENTITY RESTART_HANG_TIME "2400">
 <!ENTITY RESTART_INTERVAL "120">
@@ -39,7 +39,7 @@
     <walltime>00:15:00</walltime>
     <account>&ACCOUNT;</account>
     <cores>1</cores>
-    <command>set -x ; rm -rf <cyclestr offset="-20:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-16:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-12:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-8:00:00:00">&OUTDIR;/@Y@m@d</cyclestr></command>
+    <command>set -x ; rm -rf <cyclestr offset="-24:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-20:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-16:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-12:00:00:00">&OUTDIR;/@Y@m@d</cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/scrub.log</cyclestr></join>
     &TOPDIR_ENVAR;
     <dependency>
