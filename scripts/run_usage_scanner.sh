@@ -16,4 +16,5 @@ $disk_usage_program \
     -r `echo "/${dir}" | sed s,--,/,g` "${dir}.rst.gz" "${dir}/" \
     -o "${dir}.xml"
 
-$report_maker "${dir}.xml" > "${dir}-full.txt"
+$report_maker short "${dir}.xml" > "${dir}.txt"
+$report_maker long "${dir}-full.xml" > "${dir}-full.txt"
