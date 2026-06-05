@@ -26,6 +26,7 @@
 <!ENTITY RESTART_HANG_TIME "2400">
 <!ENTITY RESTART_INTERVAL "120">
 <!ENTITY TOPDIR_ENVAR "<envar><name>USAGE_MONITOR</name><value>&TOPDIR;</value></envar>">
+<!ENTITY DELIVER_TO_GITHUB "YES">
 ]>
 
 <workflow realtime="T" scheduler="slurm" taskthrottle="5" cyclethrottle="3" cyclelifespan="04:08:00:00">
@@ -83,7 +84,7 @@
     <account>&ACCOUNT;</account>
     <cores>1</cores>
     <native>--partition=service</native>
-    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;" "&XML_TO_TXT_REPORT;" &DIRS;</cyclestr></command>
+    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;" "&XML_TO_TXT_REPORT;" "&DELIVER_TO_GITHUB;" &DIRS;</cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/report.log</cyclestr></join>
     &TOPDIR_ENVAR;
     <dependency>
@@ -100,7 +101,7 @@
     <account>&ACCOUNT;</account>
     <cores>1</cores>
     <native>--partition=service</native>
-    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;"  "&XML_TO_TXT_REPORT;" &DIRS;</cyclestr></command>
+    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;"  "&XML_TO_TXT_REPORT;" "&DELIVER_TO_GITHUB;" &DIRS;</cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/report.log</cyclestr></join>
     &TOPDIR_ENVAR;
     <dependency>

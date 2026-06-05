@@ -12,8 +12,8 @@ YMD="$1"
 report_to_xml="$2"
 agos="$3"
 make_lustre_report="$4"
-deliver_to_github=NO # FIXME: SHOULD BE YES
-shift 4
+deliver_to_github="$5"
+shift 5
 
 echo_heading() {
     local mode=$1
