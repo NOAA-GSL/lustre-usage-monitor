@@ -1038,9 +1038,12 @@ float DiskUsage::scan_files_and_list_subdirs(
     }
 
     if(should_write_restart()) {
-      if(files_per_second > 0)
-        info("%s: am here (1) at %f files per second (min allowed %f)\n",
+      if(files_per_second > 0) {
+        info("%s: Write restart mid-directory at %f files per second (min allowed %f)\n",
                path.c_str(), files_per_second, g_min_files_per_second);
+        last_check = now;
+        files_since_last_check = 0;
+      }
       write_restart();
       write_xml_report(g_report_file, *this);
     }
@@ -1049,7 +1052,7 @@ float DiskUsage::scan_files_and_list_subdirs(
 
   if(!too_slow) {
     time_t now = time(NULL);
-    if(now > last_check) {
+    if(now > last_check + 5) {
       files_per_second = files_since_last_check / double(now - last_check);
       info("%s: Finished files only, now %f / %f = %f files per second\n",
            path.c_str(), double(files_since_last_check), double(now - last_check), files_per_second);
@@ -1057,9 +1060,6 @@ float DiskUsage::scan_files_and_list_subdirs(
   }
 
   if(!restart && walk_index==0 && should_write_restart()) {
-    if(!too_slow && files_per_second >= 0)
-      info("%s: am here (2) at %f files per second (min allowed %f)\n",
-             path.c_str(), files_per_second, g_min_files_per_second);
     write_restart();
     write_xml_report(g_report_file, *this);
   }
@@ -1138,7 +1138,7 @@ DirResult DiskUsage::tree_walk(const string &reldir,const string &path,
 
     if(should_write_restart()) {
       if(scan_rate > 0)
-        info("%s: am here (3) at %f files per second (min allowed %f)\n",
+        info("%s: Write restart while processing subdirectories at %f files per second (min allowed %f)\n",
                path.c_str(), scan_rate, g_min_files_per_second);
       write_restart();
       write_xml_report(g_report_file, *this);
