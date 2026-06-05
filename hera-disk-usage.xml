@@ -3,24 +3,27 @@
 <!DOCTYPE workflow [
 <!ENTITY TOPDIR SYSTEM "./topdir.ent">
 <!ENTITY OUTDIR "&TOPDIR;/out">
-<!ENTITY DISK_USAGE_PROGRAM "&TOPDIR;/lustre-disk-usage/lustre-disk-usage.exe">
+<!ENTITY DISK_USAGE_PROGRAM "&TOPDIR;/disk-usage/disk-usage.exe">
+<!ENTITY RUN_USAGE_SCANNER "&TOPDIR;/scripts/run_usage_scanner.sh">
+<!ENTITY XML_TO_TXT_REPORT "&TOPDIR;/scripts/make-lustre-report.py">
 <!ENTITY REPORT_SCRIPT "&TOPDIR;/scripts/final_report.sh">
 <!ENTITY XML_SCRIPT "&TOPDIR;/scripts/report_to_xml.pl">
 <!ENTITY REPORT "&OUTDIR;/report.txt">
 <!ENTITY DISK_AREAS "&TOPDIR;/disk-areas.lst">
 <!ENTITY BIG_DISK_AREAS "&TOPDIR;/big-disk-areas.lst">
-<!ENTITY DEADLINE "00:23:42:00">
+<!ENTITY DEADLINE "01:23:42:00">
 <!ENTITY SCRUB_OFFSET "00:00:30:00">
 <!ENTITY SCAN_OFFSET "00:00:30:00">
 <!ENTITY DIRS SYSTEM "./dir-entity-list.ent">
 <!ENTITY BIG_DIRS SYSTEM "./big-dir-entity-list.ent">
 <!ENTITY ALL_DIRS SYSTEM "./all-dir-entity-list.ent">
 <!ENTITY CYCLEDEF SYSTEM "./cycledef.ent">
-<!ENTITY SEARCH_DAYS "0 1 2 3">
+<!ENTITY SEARCH_DAYS "0 1 2 3 4 5 6 7 8 9 10 11 12">
 <!ENTITY ACCOUNT "zrtrr">
 <!ENTITY RESTART_HANG_TIME "1500">
 <!ENTITY RESTART_INTERVAL "120">
 <!ENTITY TOPDIR_ENVAR "<envar><name>USAGE_MONITOR</name><value>&TOPDIR;</value></envar>">
+<!ENTITY DELIVER_TO_GITHUB "NO">
 ]>
 
 <!--  This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. -->
@@ -29,7 +32,7 @@
 
 <!-- You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses -->
 
-<workflow realtime="T" scheduler="slurm" taskthrottle="8" cyclethrottle="2" cyclelifespan="01:06:00:00">
+<workflow realtime="T" scheduler="slurm" taskthrottle="10" cyclethrottle="2" cyclelifespan="02:06:00:00">
   <log>
     <cyclestr>&OUTDIR;/@Y@m@d/log/workflow.log</cyclestr>
   </log>
@@ -40,7 +43,7 @@
     <walltime>00:15:00</walltime>
     <account>&ACCOUNT;</account>
     <cores>1</cores>
-    <command>set -x ; rm -rf <cyclestr offset="-2:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-2:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-2:00:00:00">&OUTDIR;/@Y@m@d</cyclestr></command>
+    <command>set -x ; rm -rf <cyclestr offset="-6:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-4:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-2:00:00:00">&OUTDIR;/@Y@m@d</cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/scrub.log</cyclestr></join>
     &TOPDIR_ENVAR;
     <dependency>
@@ -48,14 +51,15 @@
     </dependency>
   </task>
 
-  <metatask name="du">
-    <var name="dir">&DIRS;</var>
-    <task name="#dir#" maxtries="15">
+  <metatask name="big_du">
+    <var name="dir">&BIG_DIRS;</var>
+    <task name="big_du_#dir#" maxtries="15">
       <queue>batch</queue>
       <walltime>03:00:00</walltime>
       <account>&ACCOUNT;</account>
-      <cores>1</cores>
-      <command><cyclestr>set -x ; ulimit -c 0 ; cd "&OUTDIR;/@Y@m@d" ; mkdir "#dir#" ; &DISK_USAGE_PROGRAM; -i -t "&RESTART_INTERVAL;" -d "#dir#.done" -r `echo /"#dir#" | sed s,--,/,g`  "#dir#.rst.gz" "#dir#/" -s "#dir#-short.txt" -o "#dir#-full.txt"</cyclestr></command>
+      <nodes>1:ppn=40</nodes>
+      <native>--exclusive</native>
+      <command><cyclestr>set -x ; ulimit -c 0 ; cd "&OUTDIR;/@Y@m@d" ; "&RUN_USAGE_SCANNER;" "&DISK_USAGE_PROGRAM;" "&XML_TO_TXT_REPORT;" "&RESTART_INTERVAL;" "#dir#"</cyclestr></command>
       <join><cyclestr>&OUTDIR;/@Y@m@d/log/#dir#.log</cyclestr></join>
       &TOPDIR_ENVAR;
       <dependency>
@@ -72,15 +76,14 @@
     </task>
   </metatask>
 
-  <metatask name="big_du">
-    <var name="dir">&BIG_DIRS;</var>
-    <task name="big_du_#dir#" maxtries="15">
+  <metatask name="du">
+    <var name="dir">&DIRS;</var>
+    <task name="#dir#" maxtries="15">
       <queue>batch</queue>
       <walltime>03:00:00</walltime>
       <account>&ACCOUNT;</account>
-      <nodes>1:ppn=40</nodes>
-      <native>--exclusive</native>
-      <command><cyclestr>set -x ; ulimit -c 0 ; cd "&OUTDIR;/@Y@m@d" ; mkdir "#dir#" ; &DISK_USAGE_PROGRAM; -i -t "&RESTART_INTERVAL;" -d "#dir#.done" -r `echo /"#dir#" | sed s,--,/,g`  "#dir#.rst.gz" "#dir#/" -s "#dir#-short.txt" -o "#dir#-full.txt"</cyclestr></command>
+      <cores>1</cores>
+      <command><cyclestr>set -x ; ulimit -c 0 ; cd "&OUTDIR;/@Y@m@d" ; "&RUN_USAGE_SCANNER;" "&DISK_USAGE_PROGRAM;" "&XML_TO_TXT_REPORT;" "&RESTART_INTERVAL;" "#dir#"</cyclestr></command>
       <join><cyclestr>&OUTDIR;/@Y@m@d/log/#dir#.log</cyclestr></join>
       &TOPDIR_ENVAR;
       <dependency>
@@ -102,7 +105,7 @@
     <walltime>00:05:00</walltime>
     <account>&ACCOUNT;</account>
     <cores>1</cores>
-    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;" &ALL_DIRS;</cyclestr></command>
+    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;" "&XML_TO_TXT_REPORT;" "&DELIVER_TO_GITHUB;" &DIRS;</cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/report.log</cyclestr></join>
     &TOPDIR_ENVAR;
     <dependency>
@@ -119,7 +122,7 @@
     <walltime>00:05:00</walltime>
     <account>&ACCOUNT;</account>
     <cores>1</cores>
-    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;" &ALL_DIRS;</cyclestr></command>
+    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;"  "&XML_TO_TXT_REPORT;" "&DELIVER_TO_GITHUB;" &DIRS;</cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/report.log</cyclestr></join>
     &TOPDIR_ENVAR;
     <dependency>
