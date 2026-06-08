@@ -23,7 +23,7 @@
 <!ENTITY RESTART_HANG_TIME "1500">
 <!ENTITY RESTART_INTERVAL "120">
 <!ENTITY TOPDIR_ENVAR "<envar><name>USAGE_MONITOR</name><value>&TOPDIR;</value></envar>">
-<!ENTITY DELIVER_TO_GITHUB "NO">
+<!ENTITY DELIVER_TO_GITHUB "YES">
 ]>
 
 <!--  This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. -->
@@ -53,7 +53,7 @@
 
   <metatask name="big_du">
     <var name="dir">&BIG_DIRS;</var>
-    <task name="big_du_#dir#" maxtries="15">
+    <task name="big_du_#dir#" maxtries="20">
       <queue>batch</queue>
       <walltime>03:00:00</walltime>
       <account>&ACCOUNT;</account>
@@ -78,7 +78,7 @@
 
   <metatask name="du">
     <var name="dir">&DIRS;</var>
-    <task name="#dir#" maxtries="15">
+    <task name="#dir#" maxtries="20">
       <queue>batch</queue>
       <walltime>03:00:00</walltime>
       <account>&ACCOUNT;</account>
