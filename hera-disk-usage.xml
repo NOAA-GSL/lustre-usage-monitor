@@ -14,8 +14,8 @@
 <!ENTITY DEADLINE "01:23:42:00">
 <!ENTITY SCRUB_OFFSET "00:00:30:00">
 <!ENTITY SCAN_OFFSET "00:00:30:00">
-<!ENTITY DIRS SYSTEM "./dir-entity-list.ent">
-<!ENTITY BIG_DIRS SYSTEM "./big-dir-entity-list.ent">
+<!ENTITY SHARED_NODE_DIRS SYSTEM "./shared-node-dir-entity-list.ent">
+<!ENTITY EXCLUSIVE_NODE_DIRS SYSTEM "./exclusive-node-entity-list.ent">
 <!ENTITY ALL_DIRS SYSTEM "./all-dir-entity-list.ent">
 <!ENTITY CYCLEDEF SYSTEM "./cycledef.ent">
 <!ENTITY SEARCH_DAYS "0 1 2 3 4 5 6 7 8 9 10 11 12">
@@ -52,7 +52,7 @@
   </task>
 
   <metatask name="big_du">
-    <var name="dir">&BIG_DIRS;</var>
+    <var name="dir">&EXCLUSIVE_NODE_DIRS;</var>
     <task name="big_du_#dir#" maxtries="20">
       <queue>batch</queue>
       <walltime>03:00:00</walltime>
@@ -77,7 +77,7 @@
   </metatask>
 
   <metatask name="du">
-    <var name="dir">&DIRS;</var>
+    <var name="dir">&SHARED_NODE_DIRS;</var>
     <task name="#dir#" maxtries="20">
       <queue>batch</queue>
       <walltime>03:00:00</walltime>
@@ -105,7 +105,7 @@
     <walltime>00:05:00</walltime>
     <account>&ACCOUNT;</account>
     <cores>1</cores>
-    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;" "&XML_TO_TXT_REPORT;" "&DELIVER_TO_GITHUB;" &DIRS;</cyclestr></command>
+    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;" "&XML_TO_TXT_REPORT;" "&DELIVER_TO_GITHUB;" &ALL_DIRS;</cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/report.log</cyclestr></join>
     &TOPDIR_ENVAR;
     <dependency>
@@ -122,7 +122,7 @@
     <walltime>00:05:00</walltime>
     <account>&ACCOUNT;</account>
     <cores>1</cores>
-    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;"  "&XML_TO_TXT_REPORT;" "&DELIVER_TO_GITHUB;" &DIRS;</cyclestr></command>
+    <command><cyclestr>set -x ; cd "&OUTDIR;" ; "&REPORT_SCRIPT;" @Y@m@d "&XML_SCRIPT;" "&SEARCH_DAYS;"  "&XML_TO_TXT_REPORT;" "&DELIVER_TO_GITHUB;" &ALL_DIRS;</cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/report.log</cyclestr></join>
     &TOPDIR_ENVAR;
     <dependency>

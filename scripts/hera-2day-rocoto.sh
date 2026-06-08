@@ -17,10 +17,10 @@ cd "$USAGE_MONITOR"
 echo -n "$USAGE_MONITOR" > topdir.ent
 
 areas=( $( cat hera-disk-areas.lst ) )
-echo " " ${areas[@]} | sed 's, /, ,g ; s,/,--,g' > dir-entity-list.ent
+echo " " ${areas[@]} | sed 's, /, ,g ; s,/,--,g' > shared-node-dir-entity-list.ent
 
 bigareas=( $( cat hera-big-disk-areas.lst ) )
-echo " " ${bigareas[@]} | sed 's, /, ,g ; s,/,--,g' > big-dir-entity-list.ent
+echo " " ${bigareas[@]} | sed 's, /, ,g ; s,/,--,g' > exclusive-node-entity-list.ent
 
 echo " " ${areas[@]} ${bigareas[@]} | sed 's, /, ,g ; s,/,--,g' > all-dir-entity-list.ent
 

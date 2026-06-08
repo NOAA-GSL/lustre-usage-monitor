@@ -119,7 +119,7 @@ github_deliver() {
 }
 
 find_system() {
-    if [[ -d /scratch1/NCEPDEV ]] ; then
+    if [[ -d /scratch4/BMC ]] ; then
         system=hera
     elif ( hostname | grep -i herc > /dev/null ) then
         system=hercules
