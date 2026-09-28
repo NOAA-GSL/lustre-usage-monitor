@@ -1028,11 +1028,10 @@ float DiskUsage::scan_files_and_list_subdirs(
              path.c_str(), double(files_since_last_check), double(now - last_check), files_per_second, g_min_files_per_second, double(g_slow_io_check_interval));
         if(files_per_second < g_min_files_per_second) {
           string host = strhostname();
-          warning("warning: %s: Slow scan (%f files per second) at path %s\n",
-                  host.c_str(), files_per_second, path.c_str());
-          warning("warning: %s: Aborting scan of files; proceeding to subdirectories of %s\n", host.c_str(), path.c_str());
+          warning("warning: %s: stop scanning due to slow scan (%f files per second on host %s)\n",
+                  path.c_str(), files_per_second, host.c_str());
           too_slow = true;
-          continue;
+          break;
         }
         last_check = now;
         files_since_last_check = 0;
