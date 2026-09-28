@@ -1020,32 +1020,34 @@ float DiskUsage::scan_files_and_list_subdirs(
       }
     }
 
-    time_t now = time(NULL);
-    if(now - last_check > g_slow_io_check_interval) {
-      files_per_second = files_since_last_check / double(now - last_check);
-      info("%s: Check speed. Am here at %f / %f = %f files per second (min allowed %f in %f seconds)\n",
+    if(!too_slow) {
+      time_t now = time(NULL);
+      if(now - last_check > g_slow_io_check_interval) {
+        files_per_second = files_since_last_check / double(now - last_check);
+        info("%s: Check speed. Am here at %f / %f = %f files per second (min allowed %f in %f seconds)\n",
              path.c_str(), double(files_since_last_check), double(now - last_check), files_per_second, g_min_files_per_second, double(g_slow_io_check_interval));
-      if(files_per_second < g_min_files_per_second) {
-        string host = strhostname();
-        warning("warning: %s: Slow scan (%f files per second) at path %s\n",
-                host.c_str(), files_per_second, path.c_str());
-        warning("warning: %s: Aborting scan of files; proceeding to subdirectories of %s\n", host.c_str(), path.c_str());
-        too_slow = true;
-        continue;
-      }
-      last_check = now;
-      files_since_last_check = 0;
-    }
-
-    if(should_write_restart()) {
-      if(files_per_second > 0) {
-        info("%s: Write restart mid-directory at %f files per second (min allowed %f)\n",
-               path.c_str(), files_per_second, g_min_files_per_second);
+        if(files_per_second < g_min_files_per_second) {
+          string host = strhostname();
+          warning("warning: %s: Slow scan (%f files per second) at path %s\n",
+                  host.c_str(), files_per_second, path.c_str());
+          warning("warning: %s: Aborting scan of files; proceeding to subdirectories of %s\n", host.c_str(), path.c_str());
+          too_slow = true;
+          continue;
+        }
         last_check = now;
         files_since_last_check = 0;
       }
-      write_restart();
-      write_xml_report(g_report_file, *this);
+
+      if(should_write_restart()) {
+        if(files_per_second > 0) {
+          info("%s: Write restart mid-directory at %f files per second (min allowed %f)\n",
+               path.c_str(), files_per_second, g_min_files_per_second);
+          last_check = now;
+          files_since_last_check = 0;
+        }
+        write_restart();
+        write_xml_report(g_report_file, *this);
+      }
     }
   } // directory loop
   closedir(dir);
