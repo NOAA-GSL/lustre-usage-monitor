@@ -29,7 +29,7 @@
 <!ENTITY DELIVER_TO_GITHUB "YES">
 ]>
 
-<workflow realtime="T" scheduler="slurm" taskthrottle="5" cyclethrottle="3" cyclelifespan="04:08:00:00">
+<workflow realtime="T" scheduler="slurm" taskthrottle="7" cyclethrottle="3" cyclelifespan="04:08:00:00">
   <log>
     <cyclestr>&OUTDIR;/@Y@m@d/log/workflow.log</cyclestr>
   </log>
@@ -40,7 +40,7 @@
     <walltime>00:15:00</walltime>
     <account>&ACCOUNT;</account>
     <cores>1</cores>
-    <command>set -x ; rm -rf <cyclestr offset="-24:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-20:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-16:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-12:00:00:00">&OUTDIR;/@Y@m@d</cyclestr></command>
+    <command>set -x ; rm -rf <cyclestr offset="-24:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-20:00:00:00">&OUTDIR;/@Y@m@d</cyclestr> <cyclestr offset="-16:00:00:00">&OUTDIR;/@Y@m@d</cyclestr></command>
     <join><cyclestr>&OUTDIR;/@Y@m@d/log/scrub.log</cyclestr></join>
     &TOPDIR_ENVAR;
     <dependency>
