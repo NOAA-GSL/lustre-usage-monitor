@@ -273,7 +273,7 @@ static double g_min_files_per_second=15;
 
 static string g_report_file = "";
 
-static int64_t g_slow_io_check_interval = 30;
+static int64_t g_slow_io_check_interval = 10;
 
 ////////////////////////////////////////////////////////////////////////
 
