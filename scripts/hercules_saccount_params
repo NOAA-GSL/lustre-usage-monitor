@@ -1,0 +1,7 @@
+#!/bin/bash --login
+
+now=$( date +%Y-%m-%d_%H-%M-%S)
+
+module load contrib > /dev/null 2>&1
+module load noaatools > /dev/null 2>&1
+( date ; echo ; saccount_params ) 2>&1 | gzip -c >> "$SACCOUNT_ARCHIVE_DIR/saccount_params_$now.gz"
